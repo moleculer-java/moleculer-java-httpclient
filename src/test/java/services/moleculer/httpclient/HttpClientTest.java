@@ -30,14 +30,18 @@ import junit.framework.TestCase;
 
 public class HttpClientTest  extends TestCase {
 
+	HttpClient c = new HttpClient();
+	
 	@Override
 	protected void setUp() throws Exception {
-		
+		c.init();
 	}
 	
 	@Override
 	protected void tearDown() throws Exception {
-		
+		if (c != null) {
+			c.destroy();
+		}
 	}
 	
 	// ---------------- TESTS ----------------

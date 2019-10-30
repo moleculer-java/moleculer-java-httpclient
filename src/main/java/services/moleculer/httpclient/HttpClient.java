@@ -56,7 +56,7 @@ import io.netty.util.Timer;
  * Promise based HTTP client for Moleculer-Java.
  * <pre>
  * HttpClient client = new HttpClient();
- * client.init();
+ * client.start();
  * 
  * Tree req = new Tree();
  * req.put("key1", "value1");
@@ -82,13 +82,13 @@ public class HttpClient {
 
 	// --- INIT HTTP CLIENT ---
 
-	public void init() throws Exception {
+	public void start() throws Exception {
 		client = Dsl.asyncHttpClient(builder.build());
 	}
 
 	// --- CLOSE RESOURCES ---
 
-	public void destroy() throws Exception {
+	public void stop() throws Exception {
 		closeResources();
 	}
 

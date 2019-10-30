@@ -59,20 +59,20 @@ import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.resolver.NameResolver;
 
 /**
- * An object handling an HTTP request. The HTTP request must be executed using the "execute" method.
+ * An object handling an HTTP request. The HTTP request must be executed using
+ * the "execute" method.
+ * 
  * <pre>
  * HttpClient client = new HttpClient();
  * client.init();
- * Promise p = client.post("http://host/port")
- *                   .addQueryParam("key", "value")
- *                   .execute();
+ * Promise p = client.post("http://host/port").addQueryParam("key", "value").execute();
  * Tree json = p.waitFor();
  * </pre>
  */
 public class HttpRequest {
 
 	// --- VARIABLES ---
-	
+
 	protected final AsyncHttpClient client;
 	protected final BoundRequestBuilder builder;
 
@@ -167,7 +167,7 @@ public class HttpRequest {
 						} else if (body[0] == '{' || body[0] == '[') {
 							rsp = new Tree(body);
 						} else {
-							rsp = new Tree().put("data", body);							
+							rsp = new Tree().put("data", body);
 						}
 						Tree meta = rsp.getMeta();
 						meta.put("$status", status);

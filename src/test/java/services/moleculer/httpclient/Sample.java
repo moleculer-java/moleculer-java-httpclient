@@ -33,7 +33,7 @@ public class Sample {
 		try {
 
 			HttpClient client = new HttpClient();
-			client.init();
+			client.start();
 
 			Tree req = new Tree().put("key", "value");
 

@@ -24,31 +24,129 @@
  */
 package services.moleculer.httpclient;
 
+import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.junit.Test;
 
+import io.datatree.Tree;
 import junit.framework.TestCase;
+import services.moleculer.ServiceBroker;
+import services.moleculer.config.ServiceBrokerConfig;
+import services.moleculer.context.Context;
+import services.moleculer.monitor.ConstantMonitor;
+import services.moleculer.service.Action;
+import services.moleculer.service.Service;
+import services.moleculer.web.ApiGateway;
+import services.moleculer.web.netty.NettyServer;
 
-public class HttpClientTest  extends TestCase {
+public class HttpClientTest extends TestCase {
 
-	HttpClient c = new HttpClient();
-	
+	// --- CONSTANTS ---
+
+	private static final String URL = "http://127.0.0.1:8080/test.action";
+
+	// --- VARIABLES ---
+
+	AtomicReference<Context> lastCtx = new AtomicReference<>();
+	HttpClient cl = new HttpClient();
+	ServiceBroker br;
+
+	// --- INIT / DESTROY TEST ---
+
 	@Override
+	@SuppressWarnings("unused")
 	protected void setUp() throws Exception {
-		c.init();
+
+		// Start server
+		ServiceBrokerConfig cfg = new ServiceBrokerConfig();
+		cfg.setMonitor(new ConstantMonitor());
+		br = new ServiceBroker(cfg);
+		br.createService(new NettyServer(8080));
+		ApiGateway gw = new ApiGateway("*");
+		gw.setBeforeCall((route, req, rsp, data) -> {
+			if (req == null || data == null) {
+				return;
+			}
+			Tree meta = data.getMeta();
+			meta.put("method", req.getMethod());
+			Iterator<String> headers = req.getHeaders();
+			while (headers.hasNext()) {
+				String header = headers.next();
+				meta.put(header, req.getHeader(header));
+			}
+		});
+		br.createService(gw);
+		br.createService(new Service("test") {
+
+			Action action = ctx -> {
+
+				lastCtx.set(ctx);
+				return ctx.params;
+
+			};
+
+		});
+		br.start();
+
+		// Start client
+		cl.start();
 	}
-	
+
 	@Override
 	protected void tearDown() throws Exception {
-		if (c != null) {
-			c.destroy();
+		if (cl != null) {
+			cl.stop();
+		}
+		if (br != null) {
+			br.stop();
 		}
 	}
+
+	protected Context reset() {
+		return lastCtx.getAndSet(null);
+	}
 	
+	protected void assertOk(Tree rsp) {
+		assertEquals(200, rsp.get("_meta.$status", 0));
+	}
+
+	protected void assertRestResponse(Tree rsp) {
+		Tree meta = rsp.getMeta();
+		Tree headers = meta.get("$headers");
+		assertTrue(headers.get("Cache-Control", "").contains("no-cache"));
+		assertTrue(headers.get("Content-Type", "").contains("application/json"));
+	}
+
 	// ---------------- TESTS ----------------
 
 	@Test
 	public void testHttpClientAPI() throws Exception {
 
+		Tree req = new Tree().put("a", 1).put("b", true).put("c", "d");
+		Tree rsp = cl.rest(URL).waitFor();
+		Context ctx = reset();
+		
+		assertOk(rsp);
+		assertRestResponse(rsp);
+		assertTrue(rsp.isEmpty());
+		assertFalse(ctx.params.getMeta().isEmpty());
+		assertEquals("GET", ctx.params.getMeta().get("method", ""));
+		
+		rsp = cl.rest(URL, req).waitFor();
+		ctx = reset();
+		
+		assertOk(rsp);
+		assertRestResponse(rsp);
+		System.out.println(ctx.params);
+		// assertEquals("POST", ctx.params.getMeta().get("method", ""));
+		assertEquals(1, rsp.get("a", 0));
+		assertEquals(true, rsp.get("b", false));
+		assertEquals("d", rsp.get("c", ""));
+		assertEquals(1, ctx.params.get("a", 0));
+		assertEquals(true, ctx.params.get("b", false));
+		assertEquals("d", ctx.params.get("c", ""));
+		assertTrue(rsp.get("_meta.$headers.Content-Length", 0) > 2);
 	}
-	
+
 }

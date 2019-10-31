@@ -25,9 +25,13 @@
 package services.moleculer.httpclient;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.WritableByteChannel;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -41,6 +45,7 @@ import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.BoundRequestBuilder;
 import org.asynchttpclient.HttpResponseBodyPart;
 import org.asynchttpclient.HttpResponseStatus;
+import org.asynchttpclient.ListenableFuture;
 import org.asynchttpclient.Param;
 import org.asynchttpclient.Realm;
 import org.asynchttpclient.SignatureCalculator;
@@ -57,6 +62,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.resolver.NameResolver;
+import services.moleculer.stream.PacketStream;
 
 /**
  * An object handling an HTTP request. The HTTP request must be executed using
@@ -110,7 +116,169 @@ public class HttpRequest {
 		return this;
 	}
 
-	// --- EXECUTE REQUEST ---
+	// --- "TRANSFER TO" FUNCTIONS ---
+
+	public Promise transferTo(File target) {
+		try {
+			return transferTo(new FileOutputStream(target));
+		} catch (Throwable err) {
+			return Promise.reject(err);
+		}
+	}
+
+	public Promise transferTo(WritableByteChannel target) {
+		return transferTo(new OutputStream() {
+
+			@Override
+			public final void write(int b) throws IOException {
+				target.write(ByteBuffer.wrap(new byte[] { (byte) b }));
+			}
+
+			@Override
+			public final void write(byte[] b) throws IOException {
+				target.write(ByteBuffer.wrap(b));
+			}
+
+			@Override
+			public final void write(byte[] b, int off, int len) throws IOException {
+				target.write(ByteBuffer.wrap(b, off, len));
+			}
+
+			@Override
+			public final void close() throws IOException {
+				target.close();
+			}
+
+		});
+	}
+
+	public Promise transferTo(OutputStream target) {
+		return new Promise(res -> {
+			client.executeRequest(builder.build(), new AsyncHandler<Integer>() {
+
+				private int status = 200;
+
+				@Override
+				public final State onStatusReceived(HttpResponseStatus responseStatus) throws Exception {
+					try {
+						status = responseStatus.getStatusCode();
+					} catch (Throwable err) {
+						onThrowable(err);
+						return State.ABORT;
+					}
+					return State.CONTINUE;
+				}
+
+				@Override
+				public final State onHeadersReceived(HttpHeaders httpHeaders) throws Exception {
+					return State.CONTINUE;
+				}
+
+				@Override
+				public final State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
+					try {
+						ByteBuffer buffer = bodyPart.getBodyByteBuffer();
+						int len = buffer.capacity();
+						byte[] chunk = new byte[len];
+						buffer.get(chunk, 0, len);
+						target.write(chunk, 0, len);
+					} catch (Throwable err) {
+						onThrowable(err);
+						return State.ABORT;
+					}
+					return State.CONTINUE;
+				}
+
+				@Override
+				public final Integer onCompleted() throws Exception {
+					closeStream();
+					res.resolve();
+					return status;
+				}
+
+				@Override
+				public final void onThrowable(Throwable t) {
+					closeStream();
+					res.reject(t);
+				}
+
+				private final void closeStream() {
+					if (target != null) {
+						try {
+							target.close();
+						} catch (Exception ignored) {
+						}
+					}
+				}
+
+			});
+		});
+	}
+
+	public Promise transferTo(PacketStream target) {
+		return new Promise(res -> {
+			client.executeRequest(builder.build(), new AsyncHandler<Integer>() {
+
+				private int status = 200;
+
+				@Override
+				public final State onStatusReceived(HttpResponseStatus responseStatus) throws Exception {
+					try {
+						status = responseStatus.getStatusCode();
+					} catch (Throwable err) {
+						onThrowable(err);
+						return State.ABORT;
+					}
+					return State.CONTINUE;
+				}
+
+				@Override
+				public final State onHeadersReceived(HttpHeaders httpHeaders) throws Exception {
+					return State.CONTINUE;
+				}
+
+				@Override
+				public final State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
+					try {
+						ByteBuffer buffer = bodyPart.getBodyByteBuffer();
+						int len = buffer.capacity();
+						byte[] chunk = new byte[len];
+						buffer.get(chunk, 0, len);
+						target.sendData(chunk);
+					} catch (Throwable err) {
+						onThrowable(err);
+						return State.ABORT;
+					}
+					return State.CONTINUE;
+				}
+
+				@Override
+				public final Integer onCompleted() throws Exception {
+					closeStream();
+					res.resolve();
+					return status;
+				}
+
+				@Override
+				public final void onThrowable(Throwable t) {
+					closeStream();
+					res.reject(t);
+				}
+
+				private final void closeStream() {
+					if (target != null) {
+						try {
+							target.sendClose();
+						} catch (Exception ignored) {
+						}
+					}
+				}
+
+			});
+		});
+	}
+
+	// --- EXECUTE REQUEST (JSON RESPONSE) ---
 
 	public Promise execute() {
 		return new Promise(res -> {
@@ -121,7 +289,7 @@ public class HttpRequest {
 				private byte[] body;
 
 				@Override
-				public State onStatusReceived(HttpResponseStatus responseStatus) throws Exception {
+				public final State onStatusReceived(HttpResponseStatus responseStatus) throws Exception {
 					try {
 						status = responseStatus.getStatusCode();
 					} catch (Throwable err) {
@@ -132,13 +300,13 @@ public class HttpRequest {
 				}
 
 				@Override
-				public State onHeadersReceived(HttpHeaders httpHeaders) throws Exception {
+				public final State onHeadersReceived(HttpHeaders httpHeaders) throws Exception {
 					this.httpHeaders = httpHeaders;
 					return State.CONTINUE;
 				}
 
 				@Override
-				public State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
+				public final State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
 					try {
 						ByteBuffer buffer = bodyPart.getBodyByteBuffer();
 						int len = buffer.capacity();
@@ -149,7 +317,6 @@ public class HttpRequest {
 							byte[] expanded = new byte[body.length + len];
 							System.arraycopy(body, 0, expanded, 0, body.length);
 							buffer.get(expanded, body.length, len);
-
 						}
 					} catch (Throwable err) {
 						res.reject(err);
@@ -159,7 +326,7 @@ public class HttpRequest {
 				}
 
 				@Override
-				public Integer onCompleted() throws Exception {
+				public final Integer onCompleted() throws Exception {
 					try {
 						Tree rsp;
 						if (body == null || body.length == 0) {
@@ -188,7 +355,7 @@ public class HttpRequest {
 				}
 
 				@Override
-				public void onThrowable(Throwable t) {
+				public final void onThrowable(Throwable t) {
 					res.reject(t);
 				}
 
@@ -196,6 +363,12 @@ public class HttpRequest {
 		});
 	}
 
+	// --- DELEGATED EXECUTE REQUEST ---
+	
+	public <T> ListenableFuture<T> executeRequest(AsyncHandler<T> handler) {
+		return client.executeRequest(builder.build(), handler); 
+	}
+	
 	// --- DELEGATED SETTERS ---
 
 	public HttpRequest setAddress(InetAddress address) {

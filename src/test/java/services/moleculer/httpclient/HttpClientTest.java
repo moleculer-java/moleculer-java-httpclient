@@ -147,6 +147,10 @@ public class HttpClientTest extends TestCase {
 		assertEquals(true, ctx.params.get("b", false));
 		assertEquals("d", ctx.params.get("c", ""));
 		assertTrue(rsp.get("_meta.$headers.Content-Length", 0) > 2);
+		
+		cl.ws("http://127.0.0.1:8080/ws/test", msg -> {
+			
+		}).connect();
 	}
 
 }

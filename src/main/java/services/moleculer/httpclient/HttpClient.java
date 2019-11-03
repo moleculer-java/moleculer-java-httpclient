@@ -24,6 +24,7 @@
  */
 package services.moleculer.httpclient;
 
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.function.Consumer;
 
@@ -79,11 +80,14 @@ public class HttpClient {
 
 	protected final DefaultAsyncHttpClientConfig.Builder builder = Dsl.config();
 	protected AsyncHttpClient client;
-
+	protected ScheduledExecutorService scheduler;
+	
 	// --- INIT HTTP CLIENT ---
 
 	public void start() throws Exception {
-		client = Dsl.asyncHttpClient(builder.build());
+		DefaultAsyncHttpClientConfig cfg = builder.build();
+		scheduler = cfg.getEventLoopGroup();
+		client = Dsl.asyncHttpClient(cfg);
 	}
 
 	// --- CLOSE RESOURCES ---
@@ -109,7 +113,7 @@ public class HttpClient {
 		}
 	}
 
-	// --- SIMPLIFIED REST CALL ---
+	// --- SIMPLIFIED REST CALLS ---
 
 	public Promise rest(String url) {
 		return get(url).execute();
@@ -142,6 +146,12 @@ public class HttpClient {
 			req.setBody(request);
 		}
 		return req.execute();
+	}
+	
+	// --- WEBSOCKET LISTENER / RECEIVER ---
+	
+	public WebSocketHandler ws(String url, Consumer<Tree> listener) {
+		return new WebSocketHandler(client, url, scheduler, listener);
 	}
 
 	// --- BUILDER-STYLE HTTP METHODS ---

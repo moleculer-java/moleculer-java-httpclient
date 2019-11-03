@@ -27,41 +27,23 @@ package services.moleculer.httpclient;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import java.util.Map.Entry;
 
 import org.asynchttpclient.AsyncHandler;
 import org.asynchttpclient.AsyncHttpClient;
-import org.asynchttpclient.BoundRequestBuilder;
 import org.asynchttpclient.HttpResponseBodyPart;
 import org.asynchttpclient.HttpResponseStatus;
 import org.asynchttpclient.ListenableFuture;
 import org.asynchttpclient.Param;
-import org.asynchttpclient.Realm;
-import org.asynchttpclient.SignatureCalculator;
-import org.asynchttpclient.channel.ChannelPoolPartitioning;
-import org.asynchttpclient.proxy.ProxyServer;
-import org.asynchttpclient.proxy.ProxyServer.Builder;
-import org.asynchttpclient.request.body.generator.BodyGenerator;
-import org.asynchttpclient.request.body.multipart.Part;
-import org.reactivestreams.Publisher;
 
 import io.datatree.Promise;
 import io.datatree.Tree;
-import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.cookie.Cookie;
-import io.netty.resolver.NameResolver;
 import services.moleculer.stream.PacketStream;
 
 /**
@@ -75,18 +57,17 @@ import services.moleculer.stream.PacketStream;
  * Tree json = p.waitFor();
  * </pre>
  */
-public class HttpRequest {
+public class HttpRequest extends RequestSetter {
 
 	// --- VARIABLES ---
 
 	protected final AsyncHttpClient client;
-	protected final BoundRequestBuilder builder;
 
 	// --- CONSTRUCTOR ---
 
 	protected HttpRequest(AsyncHttpClient asyncHttpClient, String method, String url) {
+		super(asyncHttpClient.prepare(method, url));
 		this.client = asyncHttpClient;
-		this.builder = asyncHttpClient.prepare(method, url);
 	}
 
 	// --- SET JSON BODY AS TREE ---
@@ -369,261 +350,4 @@ public class HttpRequest {
 		return client.executeRequest(builder.build(), handler); 
 	}
 	
-	// --- DELEGATED SETTERS ---
-
-	public HttpRequest setAddress(InetAddress address) {
-		builder.setAddress(address);
-		return this;
-	}
-
-	public HttpRequest setLocalAddress(InetAddress address) {
-		builder.setLocalAddress(address);
-		return this;
-	}
-
-	public HttpRequest setVirtualHost(String virtualHost) {
-		builder.setVirtualHost(virtualHost);
-		return this;
-	}
-
-	public HttpRequest clearHeaders() {
-		builder.clearHeaders();
-		return this;
-	}
-
-	public HttpRequest setHeader(CharSequence name, String value) {
-		builder.setHeader(name, value);
-		return this;
-	}
-
-	public HttpRequest setHeader(CharSequence name, Object value) {
-		builder.setHeader(name, value);
-		return this;
-	}
-
-	public HttpRequest setHeader(CharSequence name, Iterable<?> values) {
-		builder.setHeader(name, values);
-		return this;
-	}
-
-	public HttpRequest addHeader(CharSequence name, String value) {
-		builder.addHeader(name, value);
-		return this;
-	}
-
-	public HttpRequest addHeader(CharSequence name, Object value) {
-		builder.addHeader(name, value);
-		return this;
-	}
-
-	public HttpRequest addHeader(CharSequence name, Iterable<?> values) {
-		builder.addHeader(name, values);
-		return this;
-	}
-
-	public HttpRequest setHeaders(HttpHeaders headers) {
-		builder.setHeaders(headers);
-		return this;
-	}
-
-	public HttpRequest setHeaders(Map<? extends CharSequence, ? extends Iterable<?>> headers) {
-		builder.setHeaders(headers);
-		return this;
-	}
-
-	public HttpRequest setSingleHeaders(Map<? extends CharSequence, ?> headers) {
-		builder.setSingleHeaders(headers);
-		return this;
-	}
-
-	public HttpRequest setCookies(Collection<Cookie> cookies) {
-		builder.setCookies(cookies);
-		return this;
-	}
-
-	public HttpRequest addCookie(Cookie cookie) {
-		builder.addCookie(cookie);
-		return this;
-	}
-
-	public HttpRequest addOrReplaceCookie(Cookie cookie) {
-		builder.addOrReplaceCookie(cookie);
-		return this;
-	}
-
-	public HttpRequest resetCookies() {
-		builder.resetCookies();
-		return this;
-	}
-
-	public HttpRequest resetQuery() {
-		builder.resetQuery();
-		return this;
-	}
-
-	public HttpRequest resetFormParams() {
-		builder.resetFormParams();
-		return this;
-	}
-
-	public HttpRequest resetNonMultipartData() {
-		builder.resetNonMultipartData();
-		return this;
-	}
-
-	public HttpRequest resetMultipartData() {
-		builder.resetMultipartData();
-		return this;
-	}
-
-	public HttpRequest setBody(File file) {
-		builder.setBody(file);
-		return this;
-	}
-
-	public HttpRequest setBody(byte[] data) {
-		builder.setBody(data);
-		return this;
-	}
-
-	public HttpRequest setBody(List<byte[]> data) {
-		builder.setBody(data);
-		return this;
-	}
-
-	public HttpRequest setBody(String data) {
-		builder.setBody(data);
-		return this;
-	}
-
-	public HttpRequest setBody(ByteBuffer data) {
-		builder.setBody(data);
-		return this;
-	}
-
-	public HttpRequest setBody(InputStream stream) {
-		builder.setBody(stream);
-		return this;
-	}
-
-	public HttpRequest setBody(Publisher<ByteBuf> publisher) {
-		builder.setBody(publisher);
-		return this;
-	}
-
-	public HttpRequest setBody(Publisher<ByteBuf> publisher, long contentLength) {
-		builder.setBody(publisher, contentLength);
-		return this;
-	}
-
-	public HttpRequest setBody(BodyGenerator bodyGenerator) {
-		builder.setBody(bodyGenerator);
-		return this;
-	}
-
-	public HttpRequest addQueryParam(String name, String value) {
-		builder.addQueryParam(name, value);
-		return this;
-	}
-
-	public HttpRequest addQueryParams(List<Param> params) {
-		builder.addQueryParams(params);
-		return this;
-	}
-
-	public HttpRequest setQueryParams(Map<String, List<String>> map) {
-		builder.setQueryParams(map);
-		return this;
-	}
-
-	public HttpRequest setQueryParams(List<Param> params) {
-		builder.setQueryParams(params);
-		return this;
-	}
-
-	public HttpRequest addFormParam(String name, String value) {
-		builder.addFormParam(name, value);
-		return this;
-	}
-
-	public HttpRequest setFormParams(Map<String, List<String>> map) {
-		builder.setFormParams(map);
-		return this;
-	}
-
-	public HttpRequest setFormParams(List<Param> params) {
-		builder.setFormParams(params);
-		return this;
-	}
-
-	public HttpRequest addBodyPart(Part bodyPart) {
-		builder.addBodyPart(bodyPart);
-		return this;
-	}
-
-	public HttpRequest setBodyParts(List<Part> bodyParts) {
-		builder.setBodyParts(bodyParts);
-		return this;
-	}
-
-	public HttpRequest setProxyServer(ProxyServer proxyServer) {
-		builder.setProxyServer(proxyServer);
-		return this;
-	}
-
-	public HttpRequest setProxyServer(Builder proxyServerBuilder) {
-		builder.setProxyServer(proxyServerBuilder);
-		return this;
-	}
-
-	public HttpRequest setRealm(org.asynchttpclient.Realm.Builder realm) {
-		builder.setRealm(realm);
-		return this;
-	}
-
-	public HttpRequest setRealm(Realm realm) {
-		builder.setRealm(realm);
-		return this;
-	}
-
-	public HttpRequest setFollowRedirect(boolean followRedirect) {
-		builder.setFollowRedirect(followRedirect);
-		return this;
-	}
-
-	public HttpRequest setRequestTimeout(int requestTimeout) {
-		builder.setRequestTimeout(requestTimeout);
-		return this;
-	}
-
-	public HttpRequest setReadTimeout(int readTimeout) {
-		builder.setReadTimeout(readTimeout);
-		return this;
-	}
-
-	public HttpRequest setRangeOffset(long rangeOffset) {
-		builder.setRangeOffset(rangeOffset);
-		return this;
-	}
-
-	public HttpRequest setCharset(Charset charset) {
-		builder.setCharset(charset);
-		return this;
-	}
-
-	public HttpRequest setChannelPoolPartitioning(ChannelPoolPartitioning channelPoolPartitioning) {
-		builder.setChannelPoolPartitioning(channelPoolPartitioning);
-		return this;
-	}
-
-	public HttpRequest setNameResolver(NameResolver<InetAddress> nameResolver) {
-		builder.setNameResolver(nameResolver);
-		return this;
-	}
-
-	public HttpRequest setSignatureCalculator(SignatureCalculator signatureCalculator) {
-		builder.setSignatureCalculator(signatureCalculator);
-		return this;
-	}
-
 }

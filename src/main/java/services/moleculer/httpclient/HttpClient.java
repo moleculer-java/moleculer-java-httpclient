@@ -24,6 +24,7 @@
  */
 package services.moleculer.httpclient;
 
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.function.Consumer;
@@ -81,12 +82,17 @@ public class HttpClient {
 	protected final DefaultAsyncHttpClientConfig.Builder builder = Dsl.config();
 	protected AsyncHttpClient client;
 	protected ScheduledExecutorService scheduler;
+	protected boolean shutDownThreadPools;
 	
 	// --- INIT HTTP CLIENT ---
 
 	public void start() throws Exception {
 		DefaultAsyncHttpClientConfig cfg = builder.build();
 		scheduler = cfg.getEventLoopGroup();
+		if (scheduler == null) {
+			scheduler = Executors.newSingleThreadScheduledExecutor();
+			shutDownThreadPools = true;
+		}
 		client = Dsl.asyncHttpClient(cfg);
 	}
 
@@ -110,6 +116,10 @@ public class HttpClient {
 			} catch (Exception cause) {
 				cause.printStackTrace();
 			}
+		}
+		if (shutDownThreadPools && scheduler != null) {
+			scheduler.shutdownNow();
+			scheduler = null;
 		}
 	}
 
@@ -150,8 +160,11 @@ public class HttpClient {
 	
 	// --- WEBSOCKET LISTENER / RECEIVER ---
 	
-	public WebSocketHandler ws(String url, Consumer<Tree> listener) {
-		return new WebSocketHandler(client, url, scheduler, listener);
+	public WebSocketConnection ws(String url) {
+		if (url.startsWith("http")) {
+			url = "ws" + url.substring(4);
+		}
+		return new WebSocketConnection(client, url, scheduler);
 	}
 
 	// --- BUILDER-STYLE HTTP METHODS ---
@@ -573,6 +586,14 @@ public class HttpClient {
 	public HttpClient setIoThreadsCount(int ioThreadsCount) {
 		builder.setIoThreadsCount(ioThreadsCount);
 		return this;
+	}
+
+	public boolean isShutDownThreadPools() {
+		return shutDownThreadPools;
+	}
+
+	public void setShutDownThreadPools(boolean shutDownThreadPools) {
+		this.shutDownThreadPools = shutDownThreadPools;
 	}
 
 }

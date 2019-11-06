@@ -27,6 +27,8 @@ package services.moleculer.httpclient;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.asynchttpclient.ws.WebSocket;
+import org.asynchttpclient.ws.WebSocketListener;
 import org.junit.Test;
 
 import io.datatree.Tree;
@@ -148,9 +150,52 @@ public class HttpClientTest extends TestCase {
 		assertEquals("d", ctx.params.get("c", ""));
 		assertTrue(rsp.get("_meta.$headers.Content-Length", 0) > 2);
 		
-		cl.ws("http://127.0.0.1:8080/ws/test", msg -> {
+		Tree[] arr = new Tree[1];
+		boolean[] con = new boolean[1];
+		
+		// Connect via WebSocket
+		WebSocketConnection ws = cl.ws("http://127.0.0.1:8080/ws/test");
+		ws.addMessageListener(msg -> {
+			System.out.println("WebSocket message received: " + msg);
+			arr[0] = msg;
+		});
+		ws.addWebSocketListener(new WebSocketListener() {
 			
-		}).connect();
+			@Override
+			public void onOpen(WebSocket websocket) {
+				con[0] = true;
+				System.out.println("Connected.");
+			}
+			
+			@Override
+			public void onError(Throwable t) {
+				con[0] = false;
+			}
+			
+			@Override
+			public void onClose(WebSocket websocket, int code, String reason) {
+				con[0] = false;
+				System.out.println("Disconnected");
+			}
+			
+		});
+		ws.connect().waitFor(1000);
+		assertTrue(con[0]);
+		
+		// Send a test WebSocket packet (server -> client)
+		Tree packet = new Tree();
+		packet.put("path", "ws/test");
+		packet.putMap("data").put("a", 123).put("b", 456);
+		
+		br.broadcast("websocket.send", packet);
+		Thread.sleep(1000);
+		
+		Tree check = arr[0];
+		assertEquals(123, check.get("a", 0));
+		assertEquals(456, check.get("b", 0));
+		
+		ws.disconnect().waitFor(1000);
+		assertFalse(con[0]);
 	}
 
 }

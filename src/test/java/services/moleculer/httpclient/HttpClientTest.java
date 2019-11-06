@@ -50,9 +50,9 @@ public class HttpClientTest extends TestCase {
 
 	// --- VARIABLES ---
 
-	AtomicReference<Context> lastCtx = new AtomicReference<>();
-	HttpClient cl = new HttpClient();
-	ServiceBroker br;
+	protected AtomicReference<Context> lastCtx = new AtomicReference<>();
+	protected HttpClient cl = new HttpClient();
+	protected ServiceBroker br;
 
 	// --- INIT / DESTROY TEST ---
 

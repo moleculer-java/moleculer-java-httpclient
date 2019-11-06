@@ -161,10 +161,8 @@ public class HttpClient {
 	// --- WEBSOCKET LISTENER / RECEIVER ---
 	
 	public WebSocketConnection ws(String url) {
-		if (url.startsWith("http")) {
-			url = "ws" + url.substring(4);
-		}
-		return new WebSocketConnection(client, url, scheduler);
+		String u = url.startsWith("http") ? "ws" + url.substring(4) : url;
+		return new WebSocketConnection(client, u, scheduler);
 	}
 
 	// --- BUILDER-STYLE HTTP METHODS ---
@@ -237,7 +235,7 @@ public class HttpClient {
 		return this;
 	}
 
-	public HttpClient setRealm(org.asynchttpclient.Realm.Builder realmBuilder) {
+	public HttpClient setRealm(Realm.Builder realmBuilder) {
 		builder.setRealm(realmBuilder);
 		return this;
 	}
@@ -282,7 +280,7 @@ public class HttpClient {
 		return this;
 	}
 
-	public HttpClient setProxyServer(org.asynchttpclient.proxy.ProxyServer.Builder proxyServerBuilder) {
+	public HttpClient setProxyServer(ProxyServer.Builder proxyServerBuilder) {
 		builder.setProxyServer(proxyServerBuilder);
 		return this;
 	}

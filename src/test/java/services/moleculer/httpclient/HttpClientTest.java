@@ -141,7 +141,7 @@ public class HttpClientTest extends TestCase {
 		assertOk(rsp);
 		assertRestResponse(rsp);
 		System.out.println(ctx.params);
-		// assertEquals("POST", ctx.params.getMeta().get("method", ""));
+		assertEquals("POST", ctx.params.getMeta().get("method", ""));
 		assertEquals(1, rsp.get("a", 0));
 		assertEquals(true, rsp.get("b", false));
 		assertEquals("d", rsp.get("c", ""));

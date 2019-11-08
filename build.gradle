@@ -66,7 +66,7 @@ dependencies {
     // ================= MOLECULER =================
 	
 	// Moleculer web (required)
-	compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.2.2'
+	compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.2.3'
 	
     // ================== LOGGING ==================
 	

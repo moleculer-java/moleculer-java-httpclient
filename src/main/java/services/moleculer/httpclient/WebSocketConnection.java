@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
 import io.datatree.Promise;
 import io.datatree.Tree;
 
-public class WebSocketConnection extends RequestSetter {
+public class WebSocketConnection extends RequestSetter<WebSocketConnection> {
 
 	// --- LOGGER ---
 
@@ -364,4 +364,10 @@ public class WebSocketConnection extends RequestSetter {
 
 	}
 
+	// --- SELF TYPE ---
+	
+	protected WebSocketConnection self() {
+		return this;
+	}
+	
 }

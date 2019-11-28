@@ -24,13 +24,16 @@
  */
 package services.moleculer.httpclient;
 
+import java.io.ByteArrayOutputStream;
 import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.asynchttpclient.ws.WebSocket;
 import org.asynchttpclient.ws.WebSocketListener;
 import org.junit.Test;
 
+import io.datatree.Promise;
 import io.datatree.Tree;
 import junit.framework.TestCase;
 import services.moleculer.ServiceBroker;
@@ -39,6 +42,7 @@ import services.moleculer.context.Context;
 import services.moleculer.monitor.ConstantMonitor;
 import services.moleculer.service.Action;
 import services.moleculer.service.Service;
+import services.moleculer.stream.PacketStream;
 import services.moleculer.web.ApiGateway;
 import services.moleculer.web.netty.NettyServer;
 
@@ -46,7 +50,8 @@ public class HttpClientTest extends TestCase {
 
 	// --- CONSTANTS ---
 
-	private static final String URL = "http://127.0.0.1:8080/test.action";
+	private static final String TEST_URL = "http://127.0.0.1:8080/test.action";
+	private static final String RECEIVER_URL = "http://127.0.0.1:8080/streamReceiver.receive";
 
 	// --- VARIABLES ---
 
@@ -66,6 +71,7 @@ public class HttpClientTest extends TestCase {
 		br = new ServiceBroker(cfg);
 		br.createService(new NettyServer(8080));
 		ApiGateway gw = new ApiGateway("*");
+		gw.setDebug(true);
 		gw.setBeforeCall((route, req, rsp, data) -> {
 			if (req == null || data == null) {
 				return;
@@ -82,13 +88,13 @@ public class HttpClientTest extends TestCase {
 		br.createService(new Service("test") {
 
 			Action action = ctx -> {
-
 				lastCtx.set(ctx);
 				return ctx.params;
 
 			};
 
 		});
+		br.createService(new StreamReceiver());
 		br.start();
 
 		// Start client
@@ -120,13 +126,42 @@ public class HttpClientTest extends TestCase {
 		assertTrue(headers.get("Content-Type", "").contains("application/json"));
 	}
 
+	protected static class StreamReceiver extends Service {
+		
+		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+		AtomicBoolean closed = new AtomicBoolean();
+		AtomicReference<Throwable> error = new AtomicReference<>();
+		
+		Action receive = ctx -> {
+			Promise res = new Promise();
+			if (ctx.stream == null) {
+				res.complete(new IllegalArgumentException("missing stream"));
+			} else {
+				ctx.stream.onPacket((bytes, error, close) -> {
+					if (bytes != null) {
+						this.buffer.write(bytes);
+					}
+					if (error != null) {
+						this.error.set(error);
+					}
+					if (close) {
+						this.closed.set(true);
+						res.complete();
+					}
+				});				
+			}
+			return res;
+		};
+		
+	}
+	
 	// ---------------- TESTS ----------------
 
 	@Test
 	public void testHttpClientAPI() throws Exception {
 
 		Tree req = new Tree().put("a", 1).put("b", true).put("c", "d");
-		Tree rsp = cl.rest(URL).waitFor();
+		Tree rsp = cl.rest(TEST_URL).waitFor();
 		Context ctx = reset();
 		
 		assertOk(rsp);
@@ -135,7 +170,7 @@ public class HttpClientTest extends TestCase {
 		assertFalse(ctx.params.getMeta().isEmpty());
 		assertEquals("GET", ctx.params.getMeta().get("method", ""));
 		
-		rsp = cl.rest(URL, req).waitFor();
+		rsp = cl.rest(TEST_URL, req).waitFor();
 		ctx = reset();
 		
 		assertOk(rsp);
@@ -196,6 +231,42 @@ public class HttpClientTest extends TestCase {
 		
 		ws.disconnect().waitFor(1000);
 		assertFalse(con[0]);
+		
+		// Stream test
+		StreamReceiver receiver = (StreamReceiver) br.getLocalService("streamReceiver");
+		PacketStream sender = br.createStream();
+				
+		Promise p = cl.post(RECEIVER_URL).setBody(sender).execute();
+		
+		sender.sendData("123".getBytes());
+		Thread.sleep(1000);
+		assertEquals("123", new String(receiver.buffer.toByteArray()));
+		assertFalse(receiver.closed.get());
+		assertNull(receiver.error.get());
+		
+		sender.sendData("456".getBytes());
+		Thread.sleep(1000);
+		assertEquals("123456", new String(receiver.buffer.toByteArray()));
+		assertFalse(receiver.closed.get());
+		assertNull(receiver.error.get());
+		
+		sender.sendData("789".getBytes());
+		Thread.sleep(1000);
+		assertEquals("123456789", new String(receiver.buffer.toByteArray()));
+		assertFalse(receiver.closed.get());
+		assertNull(receiver.error.get());
+
+		sender.sendClose();
+		Thread.sleep(1000);
+		assertEquals("123456789", new String(receiver.buffer.toByteArray()));
+		assertTrue(receiver.closed.get());
+		assertNull(receiver.error.get());
+		
+		receiver.buffer.reset();
+		receiver.closed.set(false);
+		
+		rsp = p.waitFor(2000);
+		System.out.println(rsp);
 	}
 
 }

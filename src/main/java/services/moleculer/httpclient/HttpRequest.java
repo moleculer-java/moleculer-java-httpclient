@@ -57,7 +57,7 @@ import services.moleculer.stream.PacketStream;
  * Tree json = p.waitFor();
  * </pre>
  */
-public class HttpRequest extends RequestSetter {
+public class HttpRequest extends RequestSetter<HttpRequest> {
 
 	// --- VARIABLES ---
 
@@ -78,6 +78,17 @@ public class HttpRequest extends RequestSetter {
 		} else {
 			builder.setBody(data.toBinary());
 		}
+		return this;
+	}
+
+	// --- SET BINARY BODY AS MOLECULER STREAM ---
+
+	public HttpRequest setBody(PacketStream stream) {
+		return setBody(stream, -1L);
+	}
+
+	public HttpRequest setBody(PacketStream stream, long contentLength) {
+		setBody(new PacketStreamBodyGenerator(stream, contentLength));
 		return this;
 	}
 
@@ -345,9 +356,15 @@ public class HttpRequest extends RequestSetter {
 	}
 
 	// --- DELEGATED EXECUTE REQUEST ---
-	
+
 	public <T> ListenableFuture<T> executeRequest(AsyncHandler<T> handler) {
-		return client.executeRequest(builder.build(), handler); 
+		return client.executeRequest(builder.build(), handler);
 	}
-	
+
+	// --- SELF TYPE ---
+
+	protected HttpRequest self() {
+		return this;
+	}
+
 }

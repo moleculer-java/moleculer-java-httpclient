@@ -49,7 +49,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.resolver.NameResolver;
 
-public class RequestSetter {
+public abstract class RequestSetter<SELF extends RequestSetter<SELF>> {
 
 	protected final BoundRequestBuilder builder;
 	
@@ -61,259 +61,263 @@ public class RequestSetter {
 	
 	// --- DELEGATED SETTERS ---
 
-	public RequestSetter setAddress(InetAddress address) {
+	public SELF setAddress(InetAddress address) {
 		builder.setAddress(address);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setLocalAddress(InetAddress address) {
+	public SELF setLocalAddress(InetAddress address) {
 		builder.setLocalAddress(address);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setVirtualHost(String virtualHost) {
+	public SELF setVirtualHost(String virtualHost) {
 		builder.setVirtualHost(virtualHost);
-		return this;
+		return self();
 	}
 
-	public RequestSetter clearHeaders() {
+	public SELF clearHeaders() {
 		builder.clearHeaders();
-		return this;
+		return self();
 	}
 
-	public RequestSetter setHeader(CharSequence name, String value) {
+	public SELF setHeader(CharSequence name, String value) {
 		builder.setHeader(name, value);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setHeader(CharSequence name, Object value) {
+	public SELF setHeader(CharSequence name, Object value) {
 		builder.setHeader(name, value);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setHeader(CharSequence name, Iterable<?> values) {
+	public SELF setHeader(CharSequence name, Iterable<?> values) {
 		builder.setHeader(name, values);
-		return this;
+		return self();
 	}
 
-	public RequestSetter addHeader(CharSequence name, String value) {
+	public SELF addHeader(CharSequence name, String value) {
 		builder.addHeader(name, value);
-		return this;
+		return self();
 	}
 
-	public RequestSetter addHeader(CharSequence name, Object value) {
+	public SELF addHeader(CharSequence name, Object value) {
 		builder.addHeader(name, value);
-		return this;
+		return self();
 	}
 
-	public RequestSetter addHeader(CharSequence name, Iterable<?> values) {
+	public SELF addHeader(CharSequence name, Iterable<?> values) {
 		builder.addHeader(name, values);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setHeaders(HttpHeaders headers) {
+	public SELF setHeaders(HttpHeaders headers) {
 		builder.setHeaders(headers);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setHeaders(Map<? extends CharSequence, ? extends Iterable<?>> headers) {
+	public SELF setHeaders(Map<? extends CharSequence, ? extends Iterable<?>> headers) {
 		builder.setHeaders(headers);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setSingleHeaders(Map<? extends CharSequence, ?> headers) {
+	public SELF setSingleHeaders(Map<? extends CharSequence, ?> headers) {
 		builder.setSingleHeaders(headers);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setCookies(Collection<Cookie> cookies) {
+	public SELF setCookies(Collection<Cookie> cookies) {
 		builder.setCookies(cookies);
-		return this;
+		return self();
 	}
 
-	public RequestSetter addCookie(Cookie cookie) {
+	public SELF addCookie(Cookie cookie) {
 		builder.addCookie(cookie);
-		return this;
+		return self();
 	}
 
-	public RequestSetter addOrReplaceCookie(Cookie cookie) {
+	public SELF addOrReplaceCookie(Cookie cookie) {
 		builder.addOrReplaceCookie(cookie);
-		return this;
+		return self();
 	}
 
-	public RequestSetter resetCookies() {
+	public SELF resetCookies() {
 		builder.resetCookies();
-		return this;
+		return self();
 	}
 
-	public RequestSetter resetQuery() {
+	public SELF resetQuery() {
 		builder.resetQuery();
-		return this;
+		return self();
 	}
 
-	public RequestSetter resetFormParams() {
+	public SELF resetFormParams() {
 		builder.resetFormParams();
-		return this;
+		return self();
 	}
 
-	public RequestSetter resetNonMultipartData() {
+	public SELF resetNonMultipartData() {
 		builder.resetNonMultipartData();
-		return this;
+		return self();
 	}
 
-	public RequestSetter resetMultipartData() {
+	public SELF resetMultipartData() {
 		builder.resetMultipartData();
-		return this;
+		return self();
 	}
 
-	public RequestSetter setBody(File file) {
+	public SELF setBody(File file) {
 		builder.setBody(file);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setBody(byte[] data) {
+	public SELF setBody(byte[] data) {
 		builder.setBody(data);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setBody(List<byte[]> data) {
+	public SELF setBody(List<byte[]> data) {
 		builder.setBody(data);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setBody(String data) {
+	public SELF setBody(String data) {
 		builder.setBody(data);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setBody(ByteBuffer data) {
+	public SELF setBody(ByteBuffer data) {
 		builder.setBody(data);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setBody(InputStream stream) {
+	public SELF setBody(InputStream stream) {
 		builder.setBody(stream);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setBody(Publisher<ByteBuf> publisher) {
+	public SELF setBody(Publisher<ByteBuf> publisher) {
 		builder.setBody(publisher);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setBody(Publisher<ByteBuf> publisher, long contentLength) {
+	public SELF setBody(Publisher<ByteBuf> publisher, long contentLength) {
 		builder.setBody(publisher, contentLength);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setBody(BodyGenerator bodyGenerator) {
+	public SELF setBody(BodyGenerator bodyGenerator) {
 		builder.setBody(bodyGenerator);
-		return this;
+		return self();
 	}
 
-	public RequestSetter addQueryParam(String name, String value) {
+	public SELF addQueryParam(String name, String value) {
 		builder.addQueryParam(name, value);
-		return this;
+		return self();
 	}
 
-	public RequestSetter addQueryParams(List<Param> params) {
+	public SELF addQueryParams(List<Param> params) {
 		builder.addQueryParams(params);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setQueryParams(Map<String, List<String>> map) {
+	public SELF setQueryParams(Map<String, List<String>> map) {
 		builder.setQueryParams(map);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setQueryParams(List<Param> params) {
+	public SELF setQueryParams(List<Param> params) {
 		builder.setQueryParams(params);
-		return this;
+		return self();
 	}
 
-	public RequestSetter addFormParam(String name, String value) {
+	public SELF addFormParam(String name, String value) {
 		builder.addFormParam(name, value);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setFormParams(Map<String, List<String>> map) {
+	public SELF setFormParams(Map<String, List<String>> map) {
 		builder.setFormParams(map);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setFormParams(List<Param> params) {
+	public SELF setFormParams(List<Param> params) {
 		builder.setFormParams(params);
-		return this;
+		return self();
 	}
 
-	public RequestSetter addBodyPart(Part bodyPart) {
+	public SELF addBodyPart(Part bodyPart) {
 		builder.addBodyPart(bodyPart);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setBodyParts(List<Part> bodyParts) {
+	public SELF setBodyParts(List<Part> bodyParts) {
 		builder.setBodyParts(bodyParts);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setProxyServer(ProxyServer proxyServer) {
+	public SELF setProxyServer(ProxyServer proxyServer) {
 		builder.setProxyServer(proxyServer);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setProxyServer(Builder proxyServerBuilder) {
+	public SELF setProxyServer(Builder proxyServerBuilder) {
 		builder.setProxyServer(proxyServerBuilder);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setRealm(Realm.Builder realm) {
+	public SELF setRealm(Realm.Builder realm) {
 		builder.setRealm(realm);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setRealm(Realm realm) {
+	public SELF setRealm(Realm realm) {
 		builder.setRealm(realm);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setFollowRedirect(boolean followRedirect) {
+	public SELF setFollowRedirect(boolean followRedirect) {
 		builder.setFollowRedirect(followRedirect);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setRequestTimeout(int requestTimeout) {
+	public SELF setRequestTimeout(int requestTimeout) {
 		builder.setRequestTimeout(requestTimeout);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setReadTimeout(int readTimeout) {
+	public SELF setReadTimeout(int readTimeout) {
 		builder.setReadTimeout(readTimeout);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setRangeOffset(long rangeOffset) {
+	public SELF setRangeOffset(long rangeOffset) {
 		builder.setRangeOffset(rangeOffset);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setCharset(Charset charset) {
+	public SELF setCharset(Charset charset) {
 		builder.setCharset(charset);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setChannelPoolPartitioning(ChannelPoolPartitioning channelPoolPartitioning) {
+	public SELF setChannelPoolPartitioning(ChannelPoolPartitioning channelPoolPartitioning) {
 		builder.setChannelPoolPartitioning(channelPoolPartitioning);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setNameResolver(NameResolver<InetAddress> nameResolver) {
+	public SELF setNameResolver(NameResolver<InetAddress> nameResolver) {
 		builder.setNameResolver(nameResolver);
-		return this;
+		return self();
 	}
 
-	public RequestSetter setSignatureCalculator(SignatureCalculator signatureCalculator) {
+	public SELF setSignatureCalculator(SignatureCalculator signatureCalculator) {
 		builder.setSignatureCalculator(signatureCalculator);
-		return this;
+		return self();
 	}
+	
+	// --- SELF TYPE ---
+	
+	protected abstract SELF self();
 	
 }

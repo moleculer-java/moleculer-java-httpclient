@@ -33,13 +33,14 @@ import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.asynchttpclient.AsyncHandler;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.HttpResponseBodyPart;
 import org.asynchttpclient.HttpResponseStatus;
-import org.asynchttpclient.ListenableFuture;
 import org.asynchttpclient.Param;
+import org.asynchttpclient.Request;
 
 import io.datatree.Promise;
 import io.datatree.Tree;
@@ -51,32 +52,68 @@ import services.moleculer.stream.PacketStream;
  * the "execute" method.
  * 
  * <pre>
+ * // Init client: 
  * HttpClient client = new HttpClient();
- * client.init();
+ * client.start();
+ * 
+ * // Start HTTP request:
  * Promise p = client.post("http://host/port").addQueryParam("key", "value").execute();
+ * 
+ * // Blocking syntax:
  * Tree json = p.waitFor();
+ * 
+ * // Async syntax:
+ * p.then(json -&gt; {
+ *   int value1 = json.get("key1");
+ * });
  * </pre>
  */
-public class HttpRequest extends RequestSetter<HttpRequest> {
+public class HttpRequest extends DelegatedRequestBuilder<HttpRequest> {
 
-	// --- VARIABLES ---
+	// --- INTERNAL CLIENT ---
 
 	protected final AsyncHttpClient client;
 
+	// --- PROPERTIES ---
+
+	/**
+	 * Copy HTTP response status into the Meta structure of the response Tree.
+	 */
+	protected boolean returnStatus;
+
+	/**
+	 * Copy HTTP response headers into the Meta structure of the response Tree.
+	 */
+	protected boolean returnHeaders;
+
 	// --- CONSTRUCTOR ---
 
-	protected HttpRequest(AsyncHttpClient asyncHttpClient, String method, String url) {
-		super(asyncHttpClient.prepare(method, url));
-		this.client = asyncHttpClient;
+	protected HttpRequest(HttpClient httpClient, String method, String url) {
+		super(httpClient.client.prepare(method, url));
+		this.client = httpClient.client;
+		this.returnStatus = httpClient.returnStatus;
+		this.returnHeaders = httpClient.returnHeaders;
+	}
+
+	// --- BUILDER-STYLE PROPERTY SETTERS ---
+
+	public HttpRequest setReturnStatus(boolean returnStatus) {
+		this.returnStatus = returnStatus;
+		return this;
+	}
+
+	public HttpRequest setReturnHeaders(boolean returnHeaders) {
+		this.returnHeaders = returnHeaders;
+		return this;
 	}
 
 	// --- SET JSON BODY AS TREE ---
 
 	public HttpRequest setBody(Tree data) {
 		if (data == null) {
-			builder.setBody(new byte[0]);
+			setBody(new byte[0]);
 		} else {
-			builder.setBody(data.toBinary());
+			setBody(data.toBinary());
 		}
 		return this;
 	}
@@ -88,38 +125,47 @@ public class HttpRequest extends RequestSetter<HttpRequest> {
 	}
 
 	public HttpRequest setBody(PacketStream stream, long contentLength) {
-		setBody(new PacketStreamBodyGenerator(stream, contentLength));
-		return this;
+		return setBody(new PacketStreamBodyGenerator(stream, contentLength));
 	}
 
-	// --- SET FORM PARAMS AS TREE ---
+	// --- SET QUERY PARAMS BY TREE ---
 
-	public HttpRequest setFormParams(Tree data) {
-		if (data != null) {
-			int size = data.size();
+	public HttpRequest setQueryParams(Tree params) {
+		if (params != null) {
+			int size = params.size();
 			if (size > 0) {
 				ArrayList<Param> list = new ArrayList<>(size);
-				for (Tree param : data) {
+				for (Tree param : params) {
 					list.add(new Param(param.getName(), param.asString()));
 				}
-				builder.setFormParams(list);
+				setQueryParams(list);
 			}
 		}
 		return this;
 	}
 
-	// --- "TRANSFER TO" FUNCTIONS ---
+	// --- TRANSFER RESPONSE TO FILE ---
 
 	public Promise transferTo(File target) {
+		return transferTo(builder.build(), target);	
+	}
+	
+	public Promise transferTo(Request request, File target) {
 		try {
-			return transferTo(new FileOutputStream(target));
+			return transferTo(request, new FileOutputStream(target));
 		} catch (Throwable err) {
 			return Promise.reject(err);
 		}
 	}
 
+	// --- TRANSFER RESPONSE TO CHANNEL ---
+
 	public Promise transferTo(WritableByteChannel target) {
-		return transferTo(new OutputStream() {
+		return transferTo(builder.build(), target);	
+	}
+	
+	public Promise transferTo(Request request, WritableByteChannel target) {
+		return transferTo(request, new OutputStream() {
 
 			@Override
 			public final void write(int b) throws IOException {
@@ -144,192 +190,156 @@ public class HttpRequest extends RequestSetter<HttpRequest> {
 		});
 	}
 
+	// --- TRANSFER RESPONSE TO OUTPUT STREAM ---
+
 	public Promise transferTo(OutputStream target) {
-		return new Promise(res -> {
-			client.executeRequest(builder.build(), new AsyncHandler<Integer>() {
+		return transferTo(builder.build(), target);
+	}
+	
+	public Promise transferTo(Request request, OutputStream target) {
+		return execute(request, new AsyncTreeHandler() {
 
-				private int status = 200;
+			private final AtomicLong transfered = new AtomicLong();
+			
+			@Override
+			public final State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
+				ByteBuffer buffer = bodyPart.getBodyByteBuffer();
+				int len = buffer.capacity();
+				byte[] chunk = new byte[len];
+				buffer.get(chunk, 0, len);
+				target.write(chunk, 0, len);
+				transfered.addAndGet(len);
+				return State.CONTINUE;
+			}
 
-				@Override
-				public final State onStatusReceived(HttpResponseStatus responseStatus) throws Exception {
+			@Override
+			public final Tree onCompleted() throws Exception {
+				closeStream();
+				return new Tree().put("transfered", transfered.get());
+			}
+
+			@Override
+			public final void onThrowable(Throwable t) {
+				closeStream();
+			}
+
+			private final void closeStream() {
+				if (target != null) {
 					try {
-						status = responseStatus.getStatusCode();
-					} catch (Throwable err) {
-						onThrowable(err);
-						return State.ABORT;
-					}
-					return State.CONTINUE;
-				}
-
-				@Override
-				public final State onHeadersReceived(HttpHeaders httpHeaders) throws Exception {
-					return State.CONTINUE;
-				}
-
-				@Override
-				public final State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
-					try {
-						ByteBuffer buffer = bodyPart.getBodyByteBuffer();
-						int len = buffer.capacity();
-						byte[] chunk = new byte[len];
-						buffer.get(chunk, 0, len);
-						target.write(chunk, 0, len);
-					} catch (Throwable err) {
-						onThrowable(err);
-						return State.ABORT;
-					}
-					return State.CONTINUE;
-				}
-
-				@Override
-				public final Integer onCompleted() throws Exception {
-					closeStream();
-					res.resolve();
-					return status;
-				}
-
-				@Override
-				public final void onThrowable(Throwable t) {
-					closeStream();
-					res.reject(t);
-				}
-
-				private final void closeStream() {
-					if (target != null) {
-						try {
-							target.close();
-						} catch (Exception ignored) {
-						}
+						target.close();
+					} catch (Exception ignored) {
 					}
 				}
+			}
 
-			});
 		});
 	}
+
+	// --- TRANSFER RESPONSE TO MOLECULER STREAM ---
 
 	public Promise transferTo(PacketStream target) {
-		return new Promise(res -> {
-			client.executeRequest(builder.build(), new AsyncHandler<Integer>() {
+		return transferTo(builder.build(), target);
+	}
 
-				private int status = 200;
+	public Promise transferTo(Request request, PacketStream target) {
+		return execute(request, new AsyncTreeHandler() {
 
-				@Override
-				public final State onStatusReceived(HttpResponseStatus responseStatus) throws Exception {
+			private final AtomicLong transfered = new AtomicLong();
+			
+			@Override
+			public final State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
+				ByteBuffer buffer = bodyPart.getBodyByteBuffer();
+				int len = buffer.capacity();
+				byte[] chunk = new byte[len];
+				buffer.get(chunk, 0, len);
+				target.sendData(chunk);
+				transfered.addAndGet(len);
+				return State.CONTINUE;
+			}
+
+			@Override
+			public final Tree onCompleted() throws Exception {
+				closeStream();
+				return new Tree().put("transfered", transfered.get());
+			}
+
+			@Override
+			public final void onThrowable(Throwable t) {
+				closeStream();
+			}
+
+			private final void closeStream() {
+				if (target != null) {
 					try {
-						status = responseStatus.getStatusCode();
-					} catch (Throwable err) {
-						onThrowable(err);
-						return State.ABORT;
-					}
-					return State.CONTINUE;
-				}
-
-				@Override
-				public final State onHeadersReceived(HttpHeaders httpHeaders) throws Exception {
-					return State.CONTINUE;
-				}
-
-				@Override
-				public final State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
-					try {
-						ByteBuffer buffer = bodyPart.getBodyByteBuffer();
-						int len = buffer.capacity();
-						byte[] chunk = new byte[len];
-						buffer.get(chunk, 0, len);
-						target.sendData(chunk);
-					} catch (Throwable err) {
-						onThrowable(err);
-						return State.ABORT;
-					}
-					return State.CONTINUE;
-				}
-
-				@Override
-				public final Integer onCompleted() throws Exception {
-					closeStream();
-					res.resolve();
-					return status;
-				}
-
-				@Override
-				public final void onThrowable(Throwable t) {
-					closeStream();
-					res.reject(t);
-				}
-
-				private final void closeStream() {
-					if (target != null) {
-						try {
-							target.sendClose();
-						} catch (Exception ignored) {
-						}
+						target.sendClose();
+					} catch (Exception ignored) {
 					}
 				}
+			}
 
-			});
 		});
 	}
 
-	// --- EXECUTE REQUEST (JSON RESPONSE) ---
+	// --- EXECUTE REQUEST (RECEIVE JSON RESPONSE) ---
 
 	public Promise execute() {
-		return new Promise(res -> {
-			client.executeRequest(builder.build(), new AsyncHandler<Integer>() {
+		return execute(builder.build());
+	}
 
-				private int status = 200;
-				private HttpHeaders httpHeaders;
-				private byte[] body;
+	public Promise execute(Request request) {
+		return execute(request, new AsyncTreeHandler() {
 
-				@Override
-				public final State onStatusReceived(HttpResponseStatus responseStatus) throws Exception {
-					try {
-						status = responseStatus.getStatusCode();
-					} catch (Throwable err) {
-						res.reject(err);
-						return State.ABORT;
-					}
-					return State.CONTINUE;
+			private volatile int status = 200;
+			private volatile HttpHeaders httpHeaders;
+			private byte[] body;
+
+			@Override
+			public final State onStatusReceived(HttpResponseStatus responseStatus) throws Exception {
+				if (returnStatus) {
+					status = responseStatus.getStatusCode();
 				}
+				return State.CONTINUE;
+			}
 
-				@Override
-				public final State onHeadersReceived(HttpHeaders httpHeaders) throws Exception {
+			@Override
+			public final State onHeadersReceived(HttpHeaders httpHeaders) throws Exception {
+				if (returnHeaders) {
 					this.httpHeaders = httpHeaders;
-					return State.CONTINUE;
 				}
+				return State.CONTINUE;
+			}
 
-				@Override
-				public final State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
-					try {
-						ByteBuffer buffer = bodyPart.getBodyByteBuffer();
-						int len = buffer.capacity();
-						if (body == null) {
-							body = new byte[len];
-							buffer.get(body, 0, len);
-						} else {
-							byte[] expanded = new byte[body.length + len];
-							System.arraycopy(body, 0, expanded, 0, body.length);
-							buffer.get(expanded, body.length, len);
-						}
-					} catch (Throwable err) {
-						res.reject(err);
-						return State.ABORT;
-					}
-					return State.CONTINUE;
+			@Override
+			public final State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
+				ByteBuffer buffer = bodyPart.getBodyByteBuffer();
+				int len = buffer.capacity();
+				if (body == null) {
+					body = new byte[len];
+					buffer.get(body, 0, len);
+				} else {
+					byte[] expanded = new byte[body.length + len];
+					System.arraycopy(body, 0, expanded, 0, body.length);
+					buffer.get(expanded, body.length, len);
 				}
+				return State.CONTINUE;
+			}
 
-				@Override
-				public final Integer onCompleted() throws Exception {
-					try {
-						Tree rsp;
-						if (body == null || body.length == 0) {
-							rsp = new Tree();
-						} else if (body[0] == '{' || body[0] == '[') {
-							rsp = new Tree(body);
-						} else {
-							rsp = new Tree().put("data", body);
-						}
-						Tree meta = rsp.getMeta();
+			@Override
+			public final Tree onCompleted() throws Exception {
+				Tree rsp;
+				if (body == null || body.length == 0) {
+					rsp = new Tree();
+				} else if (body[0] == '{' || body[0] == '[') {
+					rsp = new Tree(body);
+				} else {
+					rsp = new Tree().put("data", body);
+				}
+				if (returnStatus || returnHeaders) {
+					Tree meta = rsp.getMeta();
+					if (returnStatus) {
 						meta.put("$status", status);
+					}
+					if (returnHeaders) {
 						Tree headers = meta.putMap("$headers");
 						if (httpHeaders != null) {
 							Iterator<Entry<CharSequence, CharSequence>> i = httpHeaders.iteratorCharSequence();
@@ -339,32 +349,74 @@ public class HttpRequest extends RequestSetter<HttpRequest> {
 								headers.put(e.getKey().toString(), e.getValue().toString());
 							}
 						}
-						res.resolve(rsp);
-					} catch (Throwable err) {
-						res.reject(err);
 					}
-					return status;
+				}
+				return rsp;
+			}
+
+		});
+	}
+
+	// --- EXECUTE REQUEST (WITH A CUSTOM HANDLER) ---
+
+	public Promise execute(AsyncHandler<?> handler) {
+		return execute(builder.build(), handler);
+	}
+
+	public Promise execute(Request request, AsyncHandler<?> handler) {
+		return new Promise(res -> {
+			client.executeRequest(request, new AsyncHandler<Object>() {
+
+				@Override
+				public final State onStatusReceived(HttpResponseStatus responseStatus) throws Exception {
+					try {
+						return handler.onStatusReceived(responseStatus);
+					} catch (Throwable t) {
+						res.reject(t);
+						throw t;
+					}
+				}
+
+				@Override
+				public final State onHeadersReceived(HttpHeaders headers) throws Exception {
+					try {
+						return handler.onHeadersReceived(headers);
+					} catch (Throwable t) {
+						res.reject(t);
+						throw t;
+					}
+				}
+
+				@Override
+				public final State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
+					try {
+						return handler.onBodyPartReceived(bodyPart);
+					} catch (Throwable t) {
+						res.reject(t);
+						throw t;
+					}
 				}
 
 				@Override
 				public final void onThrowable(Throwable t) {
 					res.reject(t);
+					handler.onThrowable(t);
+				}
+
+				@Override
+				public final Object onCompleted() throws Exception {
+					try {
+						Object result = handler.onCompleted();
+						res.resolve(result);
+						return result;
+					} catch (Throwable t) {
+						res.reject(t);
+						throw t;
+					}
 				}
 
 			});
 		});
-	}
-
-	// --- DELEGATED EXECUTE REQUEST ---
-
-	public <T> ListenableFuture<T> executeRequest(AsyncHandler<T> handler) {
-		return client.executeRequest(builder.build(), handler);
-	}
-
-	// --- SELF TYPE ---
-
-	protected HttpRequest self() {
-		return this;
 	}
 
 }

@@ -56,6 +56,7 @@ import io.netty.util.Timer;
 
 /**
  * Promise based HTTP client for Moleculer-Java.
+ * 
  * <pre>
  * HttpClient client = new HttpClient();
  * client.start();
@@ -63,15 +64,15 @@ import io.netty.util.Timer;
  * Tree req = new Tree();
  * req.put("key1", "value1");
  * 
- * client.rest("http://host/path", req).then(rsp -> {
+ * client.post("http://host/path", req).then(rsp -> {
  * 
- *   // Success
- *   String value2 = rsp.get("key2", "defaultValue");
+ * 	// Success
+ * 	String value2 = rsp.get("key2", "defaultValue");
  * 
  * }).catchError(err -> {
- *   
- *   // Failed
- *   err.printStackTrace();
+ * 
+ * 	// Failed
+ * 	err.printStackTrace();
  * });
  * </pre>
  */
@@ -79,10 +80,35 @@ public class HttpClient {
 
 	// --- PROPERTIES ---
 
+	/**
+	 * Client builder.
+	 */
 	protected final DefaultAsyncHttpClientConfig.Builder builder = Dsl.config();
+
+	/**
+	 * Async client.
+	 */
 	protected AsyncHttpClient client;
+	
+	/**
+	 * Task scheduler.
+	 */
 	protected ScheduledExecutorService scheduler;
+
+	/**
+	 * Shut down ScheduledExecutorService on stop().
+	 */
 	protected boolean shutDownThreadPools;
+
+	/**
+	 * Copy HTTP response status into the Meta structure of the response Tree.
+	 */
+	protected boolean returnStatus;
+
+	/**
+	 * Copy HTTP response headers into the Meta structure of the response Tree.
+	 */
+	protected boolean returnHeaders;
 	
 	// --- INIT HTTP CLIENT ---
 
@@ -123,87 +149,100 @@ public class HttpClient {
 		}
 	}
 
-	// --- SIMPLIFIED REST CALLS ---
-
-	public Promise rest(String url) {
-		return get(url).execute();
-	}
-
-	public Promise rest(String url, Tree request) {
-		HttpRequest req;
-		if (request == null) {
-			req = get(url);
-		} else {
-			req = post(url);
-			Tree meta = request.getMeta(false);
-			boolean contentTypeSet = false;
-			if (meta != null) {
-				Tree headers = meta.get("$headers");
-				if (headers != null) {
-					String name;
-					for (Tree header : headers) {
-						name = header.getName();
-						req.setHeader(name, headers.asString());
-						if ("Content-Type".equals(name)) {
-							contentTypeSet = true;
-						}
-					}
-				}
-			}
-			if (!contentTypeSet) {
-				req.setHeader("Content-Type", "application/json; charset=utf-8");
-			}
-			req.setBody(request);
-		}
-		return req.execute();
-	}
-	
 	// --- WEBSOCKET LISTENER / RECEIVER ---
-	
+
 	public WebSocketConnection ws(String url) {
 		String u = url.startsWith("http") ? "ws" + url.substring(4) : url;
 		return new WebSocketConnection(client, u, scheduler);
 	}
 
+	// --- SIMPLIFIED HTTP METHODS ---
+
+	public Promise get(String url, Tree params) {
+		return new HttpRequest(this, "GET", url).setQueryParams(params).execute();
+	}
+
+	public Promise post(String url, Tree params) {
+		return new HttpRequest(this, "POST", url).setBody(params).execute();
+	}
+
+	public Promise put(String url, Tree params) {
+		return new HttpRequest(this, "PUT", url).setBody(params).execute();
+	}
+	
 	// --- BUILDER-STYLE HTTP METHODS ---
 
 	public HttpRequest get(String url) {
-		return new HttpRequest(client, "GET", url);
+		return new HttpRequest(this, "GET", url);
 	}
 
 	public HttpRequest connect(String url) {
-		return new HttpRequest(client, "CONNECT", url);
+		return new HttpRequest(this, "CONNECT", url);
 	}
 
 	public HttpRequest options(String url) {
-		return new HttpRequest(client, "OPTIONS", url);
+		return new HttpRequest(this, "OPTIONS", url);
 	}
 
 	public HttpRequest head(String url) {
-		return new HttpRequest(client, "HEAD", url);
+		return new HttpRequest(this, "HEAD", url);
 	}
 
 	public HttpRequest post(String url) {
-		return new HttpRequest(client, "POST", url);
+		return new HttpRequest(this, "POST", url);
 	}
 
 	public HttpRequest put(String url) {
-		return new HttpRequest(client, "PUT", url);
+		return new HttpRequest(this, "PUT", url);
 	}
 
 	public HttpRequest delete(String url) {
-		return new HttpRequest(client, "DELETE", url);
+		return new HttpRequest(this, "DELETE", url);
 	}
 
 	public HttpRequest patch(String url) {
-		return new HttpRequest(client, "PATCH", url);
+		return new HttpRequest(this, "PATCH", url);
 	}
 
 	public HttpRequest trace(String url) {
-		return new HttpRequest(client, "TRACE", url);
+		return new HttpRequest(this, "TRACE", url);
 	}
 
-	// --- DELEGATED METHODS ---
+	// --- GETTERS / SETTERS ---
+	
+	public boolean isShutDownThreadPools() {
+		return shutDownThreadPools;
+	}
+
+	public void setShutDownThreadPools(boolean shutDownThreadPools) {
+		this.shutDownThreadPools = shutDownThreadPools;
+	}
+	
+	public ScheduledExecutorService getScheduler() {
+		return scheduler;
+	}
+
+	public void setScheduler(ScheduledExecutorService scheduler) {
+		this.scheduler = scheduler;
+	}
+	
+	public boolean isReturnStatus() {
+		return returnStatus;
+	}
+
+	public void setReturnStatus(boolean returnStatus) {
+		this.returnStatus = returnStatus;
+	}
+
+	public boolean isReturnHeaders() {
+		return returnHeaders;
+	}
+
+	public void setReturnHeaders(boolean returnHeaders) {
+		this.returnHeaders = returnHeaders;
+	}
+	
+	// --- DELEGATED SETTERS ---
 
 	public HttpClient setFollowRedirect(boolean followRedirect) {
 		builder.setFollowRedirect(followRedirect);
@@ -584,14 +623,6 @@ public class HttpClient {
 	public HttpClient setIoThreadsCount(int ioThreadsCount) {
 		builder.setIoThreadsCount(ioThreadsCount);
 		return this;
-	}
-
-	public boolean isShutDownThreadPools() {
-		return shutDownThreadPools;
-	}
-
-	public void setShutDownThreadPools(boolean shutDownThreadPools) {
-		this.shutDownThreadPools = shutDownThreadPools;
 	}
 
 }

@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
 import io.datatree.Promise;
 import io.datatree.Tree;
 
-public class WebSocketConnection extends RequestSetter<WebSocketConnection> {
+public class WebSocketConnection extends DelegatedRequestBuilder<WebSocketConnection> {
 
 	// --- LOGGER ---
 
@@ -201,7 +201,7 @@ public class WebSocketConnection extends RequestSetter<WebSocketConnection> {
 		upgradeHandlerBuilder.addWebSocketListener(connectionListener);
 		for (WebSocketListener listener : messageListeners.values()) {
 			upgradeHandlerBuilder.addWebSocketListener(listener);
-		}		
+		}
 		builder.execute(upgradeHandlerBuilder.build());
 	}
 
@@ -364,10 +364,4 @@ public class WebSocketConnection extends RequestSetter<WebSocketConnection> {
 
 	}
 
-	// --- SELF TYPE ---
-	
-	protected WebSocketConnection self() {
-		return this;
-	}
-	
 }

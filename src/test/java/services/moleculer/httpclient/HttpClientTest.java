@@ -98,6 +98,8 @@ public class HttpClientTest extends TestCase {
 		br.start();
 
 		// Start client
+		cl.setReturnStatus(true);
+		cl.setReturnHeaders(true);
 		cl.start();
 	}
 
@@ -161,16 +163,16 @@ public class HttpClientTest extends TestCase {
 	public void testHttpClientAPI() throws Exception {
 
 		Tree req = new Tree().put("a", 1).put("b", true).put("c", "d");
-		Tree rsp = cl.rest(TEST_URL).waitFor();
+		Tree rsp = cl.get(TEST_URL, req).waitFor();
 		Context ctx = reset();
 		
 		assertOk(rsp);
 		assertRestResponse(rsp);
-		assertTrue(rsp.isEmpty());
+		assertFalse(rsp.isEmpty());
 		assertFalse(ctx.params.getMeta().isEmpty());
 		assertEquals("GET", ctx.params.getMeta().get("method", ""));
 		
-		rsp = cl.rest(TEST_URL, req).waitFor();
+		rsp = cl.post(TEST_URL).setBody(req).execute().waitFor();
 		ctx = reset();
 		
 		assertOk(rsp);

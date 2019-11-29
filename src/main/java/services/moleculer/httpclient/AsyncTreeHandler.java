@@ -24,38 +24,38 @@
  */
 package services.moleculer.httpclient;
 
+import org.asynchttpclient.AsyncHandler;
+import org.asynchttpclient.HttpResponseBodyPart;
+import org.asynchttpclient.HttpResponseStatus;
+
 import io.datatree.Tree;
+import io.netty.handler.codec.http.HttpHeaders;
 
-public class Sample {
+public abstract class AsyncTreeHandler implements AsyncHandler<Tree> {
 
-	public static void main(String[] args) {
-		System.out.println("START");
-		try {
-
-			// Init client
-			HttpClient client = new HttpClient();
-			client.start();
-			
-			// Create JSON request (=POST body)
-			Tree req = new Tree().put("key", "value");
-
-			// Invoke REST service
-			client.post("http://localhost:4151/", req).then(rsp -> {
-				
-				// Success (rsp = JSON response)
-				System.out.println(rsp);
-				
-			}).catchError(err -> {
-				
-				// Failed (err = Throwable)
-				err.printStackTrace();
-				
-			});
-						
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		System.out.println("STOP");
+	@Override
+	public State onStatusReceived(HttpResponseStatus responseStatus) throws Exception {
+		return State.CONTINUE;
 	}
+
+	@Override
+	public State onHeadersReceived(HttpHeaders headers) throws Exception {
+		return State.CONTINUE;
+	}
+
+	@Override
+	public State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
+		return State.CONTINUE;
+	}
+
+	@Override
+	public void onThrowable(Throwable t) {
+	}
+
+	@Override
+	public Tree onCompleted() throws Exception {
+		return new Tree();
+	}
+
 
 }

@@ -24,44 +24,47 @@
  */
 package services.moleculer.httpclient;
 
+import java.nio.ByteBuffer;
+
+import org.asynchttpclient.HttpResponseBodyPart;
+
 import io.datatree.Tree;
+import services.moleculer.util.CheckedTree;
 
-public class Sample {
+public class ResponseToBytes extends ResponseHandler {
 
-	public static void main(String[] args) {
-		System.out.println("START");
-		try {
+	// --- VARIABLES ---
+	
+	protected byte[] bytes;
+	
+	// --- CONSTRUCTOR ---
 
-			// Init client
-			HttpClient client = new HttpClient();
-			client.start();
-			
-			// Create JSON request (=POST body)
-			Tree req = new Tree().put("key", "value");
-
-			client.post("", params -> {
-				params.addCookie(null);
-			}).then(rsp -> {
-				
-			});
-			
-			// Invoke REST service
-			client.post("http://localhost:4151/", req).then(rsp -> {
-				
-				// Success (rsp = JSON response)
-				System.out.println(rsp);
-				
-			}).catchError(err -> {
-				
-				// Failed (err = Throwable)
-				err.printStackTrace();
-				
-			});
-			
-		} catch (Exception e) {
-			e.printStackTrace();
+	protected ResponseToBytes(RequestParams params) {
+		super(params);
+	}
+	
+	// --- REQUEST PROCESSORS ---
+	
+	@Override
+	public State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
+		ByteBuffer buffer = bodyPart.getBodyByteBuffer();
+		int len = buffer.capacity();
+		if (bytes == null) {
+			bytes = new byte[len];
+			buffer.get(bytes, 0, len);
+		} else {
+			byte[] expanded = new byte[bytes.length + len];
+			System.arraycopy(bytes, 0, expanded, 0, bytes.length);
+			buffer.get(expanded, bytes.length, len);
 		}
-		System.out.println("STOP");
+		return State.CONTINUE;
+	}
+
+	@Override
+	public Tree onCompleted() throws Exception {
+		Tree rsp = new CheckedTree(bytes);
+		addStatusAndHeaders(rsp);
+		return rsp;
 	}
 
 }

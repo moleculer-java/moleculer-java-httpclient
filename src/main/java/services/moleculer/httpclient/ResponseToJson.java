@@ -26,42 +26,26 @@ package services.moleculer.httpclient;
 
 import io.datatree.Tree;
 
-public class Sample {
+public class ResponseToJson extends ResponseToBytes {
+	
+	// --- CONSTRUCTOR ---
 
-	public static void main(String[] args) {
-		System.out.println("START");
-		try {
-
-			// Init client
-			HttpClient client = new HttpClient();
-			client.start();
-			
-			// Create JSON request (=POST body)
-			Tree req = new Tree().put("key", "value");
-
-			client.post("", params -> {
-				params.addCookie(null);
-			}).then(rsp -> {
-				
-			});
-			
-			// Invoke REST service
-			client.post("http://localhost:4151/", req).then(rsp -> {
-				
-				// Success (rsp = JSON response)
-				System.out.println(rsp);
-				
-			}).catchError(err -> {
-				
-				// Failed (err = Throwable)
-				err.printStackTrace();
-				
-			});
-			
-		} catch (Exception e) {
-			e.printStackTrace();
+	protected ResponseToJson(RequestParams params) {
+		super(params);
+	}
+	
+	// --- REQUEST PROCESSORS ---
+	
+	@Override
+	public Tree onCompleted() throws Exception {
+		Tree rsp;
+		if (bytes.length == 0) {
+			rsp = new Tree();
+		} else {
+			rsp = new Tree(bytes);
 		}
-		System.out.println("STOP");
+		addStatusAndHeaders(rsp);
+		return rsp;
 	}
 
 }

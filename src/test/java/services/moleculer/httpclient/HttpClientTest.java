@@ -98,8 +98,6 @@ public class HttpClientTest extends TestCase {
 		br.start();
 
 		// Start client
-		cl.setReturnStatus(true);
-		cl.setReturnHeaders(true);
 		cl.start();
 	}
 
@@ -116,7 +114,7 @@ public class HttpClientTest extends TestCase {
 	protected Context reset() {
 		return lastCtx.getAndSet(null);
 	}
-	
+
 	protected void assertOk(Tree rsp) {
 		assertEquals(200, rsp.get("_meta.$status", 0));
 	}
@@ -129,11 +127,11 @@ public class HttpClientTest extends TestCase {
 	}
 
 	protected static class StreamReceiver extends Service {
-		
+
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 		AtomicBoolean closed = new AtomicBoolean();
 		AtomicReference<Throwable> error = new AtomicReference<>();
-		
+
 		Action receive = ctx -> {
 			Promise res = new Promise();
 			if (ctx.stream == null) {
@@ -150,34 +148,39 @@ public class HttpClientTest extends TestCase {
 						this.closed.set(true);
 						res.complete();
 					}
-				});				
+				});
 			}
 			return res;
 		};
-		
+
 	}
-	
+
 	// ---------------- TESTS ----------------
 
 	@Test
 	public void testHttpClientAPI() throws Exception {
 
 		Tree req = new Tree().put("a", 1).put("b", true).put("c", "d");
-		Tree rsp = cl.get(TEST_URL, req).waitFor();
+		Tree rsp = cl.get(TEST_URL, req, params -> {
+			params.setReturnHttpHeaders(true);
+			params.setReturnStatusCode(true);
+		}).waitFor();
+
 		Context ctx = reset();
-		
 		assertOk(rsp);
 		assertRestResponse(rsp);
 		assertFalse(rsp.isEmpty());
 		assertFalse(ctx.params.getMeta().isEmpty());
 		assertEquals("GET", ctx.params.getMeta().get("method", ""));
-		
-		rsp = cl.post(TEST_URL).setBody(req).execute().waitFor();
+
+		rsp = cl.post(TEST_URL, req, params -> {
+			params.setReturnHttpHeaders(true).setReturnStatusCode(true);
+		}).waitFor();
+
 		ctx = reset();
-		
 		assertOk(rsp);
 		assertRestResponse(rsp);
-		System.out.println(ctx.params);
+
 		assertEquals("POST", ctx.params.getMeta().get("method", ""));
 		assertEquals(1, rsp.get("a", 0));
 		assertEquals(true, rsp.get("b", false));
@@ -186,10 +189,10 @@ public class HttpClientTest extends TestCase {
 		assertEquals(true, ctx.params.get("b", false));
 		assertEquals("d", ctx.params.get("c", ""));
 		assertTrue(rsp.get("_meta.$headers.Content-Length", 0) > 2);
-		
+
 		Tree[] arr = new Tree[1];
 		boolean[] con = new boolean[1];
-		
+
 		// Connect via WebSocket
 		WebSocketConnection ws = cl.ws("http://127.0.0.1:8080/ws/test");
 		ws.addMessageListener(msg -> {
@@ -197,61 +200,61 @@ public class HttpClientTest extends TestCase {
 			arr[0] = msg;
 		});
 		ws.addWebSocketListener(new WebSocketListener() {
-			
+
 			@Override
 			public void onOpen(WebSocket websocket) {
 				con[0] = true;
 				System.out.println("Connected.");
 			}
-			
+
 			@Override
 			public void onError(Throwable t) {
 				con[0] = false;
 			}
-			
+
 			@Override
 			public void onClose(WebSocket websocket, int code, String reason) {
 				con[0] = false;
 				System.out.println("Disconnected");
 			}
-			
+
 		});
 		ws.connect().waitFor(1000);
 		assertTrue(con[0]);
-		
+
 		// Send a test WebSocket packet (server -> client)
 		Tree packet = new Tree();
 		packet.put("path", "ws/test");
 		packet.putMap("data").put("a", 123).put("b", 456);
-		
+
 		br.broadcast("websocket.send", packet);
 		Thread.sleep(1000);
-		
+
 		Tree check = arr[0];
 		assertEquals(123, check.get("a", 0));
 		assertEquals(456, check.get("b", 0));
-		
-		ws.disconnect().waitFor(1000);
+
+		ws.disconnect().waitFor(2000);
 		assertFalse(con[0]);
-		
+
 		// Stream test
 		StreamReceiver receiver = (StreamReceiver) br.getLocalService("streamReceiver");
 		PacketStream sender = br.createStream();
-				
-		Promise p = cl.post(RECEIVER_URL).setBody(sender).execute();
-		
+
+		Promise p = cl.post(RECEIVER_URL, sender);
+
 		sender.sendData("123".getBytes());
 		Thread.sleep(1000);
 		assertEquals("123", new String(receiver.buffer.toByteArray()));
 		assertFalse(receiver.closed.get());
 		assertNull(receiver.error.get());
-		
+
 		sender.sendData("456".getBytes());
 		Thread.sleep(1000);
 		assertEquals("123456", new String(receiver.buffer.toByteArray()));
 		assertFalse(receiver.closed.get());
 		assertNull(receiver.error.get());
-		
+
 		sender.sendData("789".getBytes());
 		Thread.sleep(1000);
 		assertEquals("123456789", new String(receiver.buffer.toByteArray()));
@@ -263,10 +266,10 @@ public class HttpClientTest extends TestCase {
 		assertEquals("123456789", new String(receiver.buffer.toByteArray()));
 		assertTrue(receiver.closed.get());
 		assertNull(receiver.error.get());
-		
+
 		receiver.buffer.reset();
 		receiver.closed.set(false);
-		
+
 		rsp = p.waitFor(2000);
 		System.out.println(rsp);
 	}

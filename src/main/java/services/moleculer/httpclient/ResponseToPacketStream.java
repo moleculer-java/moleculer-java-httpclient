@@ -24,38 +24,56 @@
  */
 package services.moleculer.httpclient;
 
-import org.asynchttpclient.AsyncHandler;
+import java.nio.ByteBuffer;
+
 import org.asynchttpclient.HttpResponseBodyPart;
-import org.asynchttpclient.HttpResponseStatus;
 
 import io.datatree.Tree;
-import io.netty.handler.codec.http.HttpHeaders;
+import services.moleculer.stream.PacketStream;
 
-public abstract class AsyncTreeHandler implements AsyncHandler<Tree> {
+public class ResponseToPacketStream extends ResponseHandler {
 
-	@Override
-	public State onStatusReceived(HttpResponseStatus responseStatus) throws Exception {
-		return State.CONTINUE;
+	// --- VARIABLES ---
+
+	protected final PacketStream target;
+
+	// --- CONSTRUCTOR ---
+
+	protected ResponseToPacketStream(RequestParams params, PacketStream target) {
+		super(params);
+		this.target = target;
 	}
 
+	// --- REQUEST PROCESSORS ---
+
 	@Override
-	public State onHeadersReceived(HttpHeaders headers) throws Exception {
-		return State.CONTINUE;
+	public void onThrowable(Throwable t) {
+		closeStream();
 	}
 
 	@Override
 	public State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
+		ByteBuffer buffer = bodyPart.getBodyByteBuffer();
+		int len = buffer.capacity();
+		byte[] chunk = new byte[len];
+		buffer.get(chunk, 0, len);
+		target.sendData(chunk);
 		return State.CONTINUE;
 	}
 
 	@Override
-	public void onThrowable(Throwable t) {
-	}
-
-	@Override
 	public Tree onCompleted() throws Exception {
-		return new Tree();
+		closeStream();
+		Tree rsp = new Tree();
+		rsp.put("transfered", target.getTransferedBytes());
+		addStatusAndHeaders(rsp);
+		return rsp;
 	}
 
+	protected void closeStream() {
+		if (target != null) {
+			target.sendClose();
+		}
+	}
 
 }

@@ -24,44 +24,45 @@
  */
 package services.moleculer.httpclient;
 
+import java.util.LinkedList;
+import java.util.function.Consumer;
+
+import org.asynchttpclient.Param;
+
 import io.datatree.Tree;
 
-public class Sample {
+public class TreeConfigurator implements Consumer<RequestParams> {
 
-	public static void main(String[] args) {
-		System.out.println("START");
-		try {
-
-			// Init client
-			HttpClient client = new HttpClient();
-			client.start();
-			
-			// Create JSON request (=POST body)
-			Tree req = new Tree().put("key", "value");
-
-			client.post("", params -> {
-				params.addCookie(null);
-			}).then(rsp -> {
-				
-			});
-			
-			// Invoke REST service
-			client.post("http://localhost:4151/", req).then(rsp -> {
-				
-				// Success (rsp = JSON response)
-				System.out.println(rsp);
-				
-			}).catchError(err -> {
-				
-				// Failed (err = Throwable)
-				err.printStackTrace();
-				
-			});
-			
-		} catch (Exception e) {
-			e.printStackTrace();
+	// --- VARIABLES ---
+	
+	protected final Consumer<RequestParams> configurator;
+	protected final Tree request;
+	protected final boolean post;
+	
+	// --- CONSTRUCTOR ---
+	
+	protected TreeConfigurator(Consumer<RequestParams> configurator, Tree request, boolean post) {
+		this.configurator = configurator;
+		this.request = request;
+		this.post = post;
+	}
+	
+	@Override
+	public void accept(RequestParams params) {
+		if (request != null && !request.isEmpty()) {
+			if (post) {
+				params.setBody(request.toBinary());
+			} else {
+				LinkedList<Param> list = new LinkedList<>();
+				for (Tree item : request) {
+					list.addLast(new Param(item.getName(), item.asString()));
+				}
+				params.setQueryParams(list);
+			}
 		}
-		System.out.println("STOP");
+		if (configurator != null) {
+			configurator.accept(params);
+		}		
 	}
 
 }

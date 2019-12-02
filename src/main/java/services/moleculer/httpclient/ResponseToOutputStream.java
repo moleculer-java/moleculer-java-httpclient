@@ -24,44 +24,63 @@
  */
 package services.moleculer.httpclient;
 
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.asynchttpclient.HttpResponseBodyPart;
+
 import io.datatree.Tree;
 
-public class Sample {
+public class ResponseToOutputStream extends ResponseHandler {
 
-	public static void main(String[] args) {
-		System.out.println("START");
-		try {
+	// --- VARIABLES ---
 
-			// Init client
-			HttpClient client = new HttpClient();
-			client.start();
-			
-			// Create JSON request (=POST body)
-			Tree req = new Tree().put("key", "value");
+	protected final OutputStream target;
+	
+	protected final AtomicLong transfered = new AtomicLong();
+	
+	// --- CONSTRUCTOR ---
 
-			client.post("", params -> {
-				params.addCookie(null);
-			}).then(rsp -> {
-				
-			});
-			
-			// Invoke REST service
-			client.post("http://localhost:4151/", req).then(rsp -> {
-				
-				// Success (rsp = JSON response)
-				System.out.println(rsp);
-				
-			}).catchError(err -> {
-				
-				// Failed (err = Throwable)
-				err.printStackTrace();
-				
-			});
-			
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		System.out.println("STOP");
+	protected ResponseToOutputStream(RequestParams params, OutputStream target) {
+		super(params);
+		this.target = target;
+	}
+	
+	// --- REQUEST PROCESSORS ---
+
+	@Override
+	public void onThrowable(Throwable t) {
+		closeStream();
 	}
 
+	@Override
+	public State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
+		ByteBuffer buffer = bodyPart.getBodyByteBuffer();
+		int len = buffer.capacity();
+		byte[] chunk = new byte[len];
+		buffer.get(chunk, 0, len);
+		target.write(chunk, 0, len);
+		transfered.addAndGet(len);
+		return State.CONTINUE;
+	}
+
+	@Override
+	public Tree onCompleted() throws Exception {
+		closeStream();
+		Tree rsp = new Tree();
+		rsp.put("transfered", transfered.get());
+		addStatusAndHeaders(rsp);
+		return rsp;
+	}
+
+	protected void closeStream() {
+		if (target != null) {
+			try {
+				target.close();
+			} catch (Exception ignored) {
+			}
+		}
+	}
+	
 }

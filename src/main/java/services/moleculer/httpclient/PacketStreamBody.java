@@ -35,9 +35,13 @@ import services.moleculer.stream.PacketStream;
 
 public class PacketStreamBody implements Body {
 
+	// --- VARIABLES ---
+	
 	protected final ConcurrentLinkedQueue<byte[]> queue = new ConcurrentLinkedQueue<>();
 	protected final PacketStream stream;
 	protected final long contentLength;
+	
+	// --- CONSTRUCTOR ---
 	
 	public PacketStreamBody(PacketStream stream, long contentLength) {
 		this.stream = stream;

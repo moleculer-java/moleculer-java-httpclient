@@ -24,44 +24,32 @@
  */
 package services.moleculer.httpclient;
 
-import io.datatree.Tree;
+import java.util.function.Consumer;
 
-public class Sample {
+import services.moleculer.stream.PacketStream;
 
-	public static void main(String[] args) {
-		System.out.println("START");
-		try {
+public class PacketStreamConfigurator implements Consumer<RequestParams> {
 
-			// Init client
-			HttpClient client = new HttpClient();
-			client.start();
-			
-			// Create JSON request (=POST body)
-			Tree req = new Tree().put("key", "value");
+	// --- VARIABLES ---
+	
+	protected final Consumer<RequestParams> configurator;
+	protected final PacketStream request;
 
-			client.post("", params -> {
-				params.addCookie(null);
-			}).then(rsp -> {
-				
-			});
-			
-			// Invoke REST service
-			client.post("http://localhost:4151/", req).then(rsp -> {
-				
-				// Success (rsp = JSON response)
-				System.out.println(rsp);
-				
-			}).catchError(err -> {
-				
-				// Failed (err = Throwable)
-				err.printStackTrace();
-				
-			});
-			
-		} catch (Exception e) {
-			e.printStackTrace();
+	// --- CONSTRUCTOR ---
+	
+	protected PacketStreamConfigurator(Consumer<RequestParams> configurator, PacketStream request) {
+		this.configurator = configurator;
+		this.request = request;
+	}
+
+	@Override
+	public void accept(RequestParams params) {
+		if (request != null) {
+			params.setBody(request);
 		}
-		System.out.println("STOP");
+		if (configurator != null) {
+			configurator.accept(params);
+		}
 	}
 
 }

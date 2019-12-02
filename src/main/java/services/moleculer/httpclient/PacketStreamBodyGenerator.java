@@ -33,8 +33,12 @@ import services.moleculer.stream.PacketStream;
 
 public class PacketStreamBodyGenerator implements FeedableBodyGenerator {
 
+	// --- VARIABLES ---
+	
 	protected final PacketStreamBody body;
 
+	// --- CONSTRUCTOR ---
+	
 	public PacketStreamBodyGenerator(PacketStream stream, long contentLength) {
 		body = new PacketStreamBody(stream, contentLength);
 	}

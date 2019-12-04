@@ -31,6 +31,10 @@ import org.asynchttpclient.HttpResponseBodyPart;
 import io.datatree.Tree;
 import services.moleculer.stream.PacketStream;
 
+/**
+ * Redirects response into the specific Moleculer PacketStream (eg. to another
+ * Moleculer node / service).
+ */
 public class ResponseToPacketStream extends ResponseHandler {
 
 	// --- VARIABLES ---

@@ -26,6 +26,9 @@ package services.moleculer.httpclient;
 
 import io.datatree.Tree;
 
+/**
+ * Returns the response in a Tree object (~= JSON object).
+ */
 public class ResponseToJson extends ResponseToBytes {
 	
 	// --- CONSTRUCTOR ---

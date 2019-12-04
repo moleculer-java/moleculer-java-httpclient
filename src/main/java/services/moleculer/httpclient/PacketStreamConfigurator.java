@@ -28,6 +28,9 @@ import java.util.function.Consumer;
 
 import services.moleculer.stream.PacketStream;
 
+/**
+ * Configurator for PacketStream-based requests.
+ */
 public class PacketStreamConfigurator implements Consumer<RequestParams> {
 
 	// --- VARIABLES ---

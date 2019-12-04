@@ -24,11 +24,13 @@
  */
 package services.moleculer.httpclient;
 
+import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Consumer;
 
 import org.asynchttpclient.AsyncHandler;
+import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.DefaultAsyncHttpClient;
 import org.asynchttpclient.DefaultAsyncHttpClientConfig;
 import org.asynchttpclient.HttpResponseBodyPart;
@@ -41,24 +43,56 @@ import io.netty.handler.codec.http.HttpHeaders;
 import services.moleculer.stream.PacketStream;
 
 /**
- * Promise based HTTP client for Moleculer-Java.
+ * Promise based HTTP client for Moleculer-Java. Usage:
  * 
  * <pre>
  * HttpClient client = new HttpClient();
  * client.start();
  * 
+ * // Build JSON request
  * Tree req = new Tree();
  * req.put("key1", "value1");
  * 
  * client.post("http://host/path", req).then(rsp -> {
  * 
- * 	// Success
+ * 	// Success (process JSON response)
  * 	String value2 = rsp.get("key2", "defaultValue");
  * 
  * }).catchError(err -> {
  * 
  * 	// Failed
  * 	err.printStackTrace();
+ * 
+ * });
+ * </pre>
+ * 
+ * Advanced usage with custom parameters:
+ * 
+ * <pre>
+ * client.post("http://server/path", params -> {
+ * 
+ * 	params.addHeader("key", "value");
+ * 	params.setRequestTimeout(3000);
+ * 
+ * }).then(rsp -> {
+ * 
+ * 	// Success
+ * 
+ * }).catchError(err -> {
+ * 
+ * 	// Failed
+ * 
+ * });
+ * </pre>
+ * 
+ * Receiving WebSocket messages from server:
+ * 
+ * <pre>
+ * client.ws("ws://server/path", msg -> {
+ *   
+ *   // Message received; "msg" is a JSON structure
+ *   String value = msg.get("key", "defaultValue");
+ *   
  * });
  * </pre>
  */
@@ -66,6 +100,9 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 
 	// --- VARIABLES ---
 
+	/**
+	 * Internal AsyncHttpClient instance.
+	 */
 	protected DefaultAsyncHttpClient client;
 
 	/**
@@ -75,7 +112,7 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	protected SignatureCalculator signatureCalculator;
 
 	/**
-	 * Task scheduler.
+	 * Task scheduler (for WebSocket heartbeat function).
 	 */
 	protected ScheduledExecutorService scheduler;
 
@@ -87,6 +124,8 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	// --- INIT HTTP CLIENT ---
 
 	public void start() {
+
+		// Build AsyncHttpClient
 		client = new DefaultAsyncHttpClient(build());
 	}
 
@@ -115,17 +154,6 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 		}
 	}
 
-	protected ScheduledExecutorService getScheduler() {
-		if (scheduler == null) {
-			scheduler = client.getEventLoopGroup();
-			if (scheduler == null) {
-				scheduler = Executors.newSingleThreadScheduledExecutor();
-				shutDownThreadPools = true;
-			}
-		}
-		return scheduler;
-	}
-	
 	// --- SIMPLIFIED HTTP METHODS ---
 
 	/**
@@ -150,8 +178,22 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * 
 	 * @return {@link Promise}
 	 */
-	public Promise get(String url, Tree params) {
-		return get(url, params, null);
+	public Promise get(String url, Tree request) {
+		return get(url, request, null);
+	}
+
+	/**
+	 * Executes an HTTP GET request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param configurator
+	 *            Consumer for set the parameters of the request
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise get(String url, Consumer<RequestParams> configurator) {
+		return get(url, null, configurator);
 	}
 
 	/**
@@ -179,7 +221,21 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise connect(String url) {
-		return connect(url, null);
+		return connect(url, null, null);
+	}
+
+	/**
+	 * Executes an HTTP CONNECT request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request parameters in a Tree
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise connect(String url, Tree request) {
+		return connect(url, request, null);
 	}
 
 	/**
@@ -193,7 +249,23 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise connect(String url, Consumer<RequestParams> configurator) {
-		return execute(url, "CONNECT", configurator);
+		return connect(url, null, configurator);
+	}
+
+	/**
+	 * Executes an HTTP CONNECT request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request parameters in a Tree
+	 * @param configurator
+	 *            Consumer for set the parameters of the request
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise connect(String url, Tree request, Consumer<RequestParams> configurator) {
+		return execute(url, "CONNECT", new TreeConfigurator(configurator, request, false));
 	}
 
 	/**
@@ -205,7 +277,21 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise options(String url) {
-		return options(url, null);
+		return options(url, null, null);
+	}
+
+	/**
+	 * Executes an HTTP OPTIONS request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request parameters in a Tree
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise options(String url, Tree request) {
+		return options(url, request, null);
 	}
 
 	/**
@@ -219,7 +305,23 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise options(String url, Consumer<RequestParams> configurator) {
-		return execute(url, "OPTIONS", configurator);
+		return options(url, null, configurator);
+	}
+
+	/**
+	 * Executes an HTTP OPTIONS request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request parameters in a Tree
+	 * @param configurator
+	 *            Consumer for set the parameters of the request
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise options(String url, Tree request, Consumer<RequestParams> configurator) {
+		return execute(url, "OPTIONS", new TreeConfigurator(configurator, request, true));
 	}
 
 	/**
@@ -231,7 +333,21 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise head(String url) {
-		return head(url, null);
+		return head(url, null, null);
+	}
+
+	/**
+	 * Executes an HTTP HEAD request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request parameters in a Tree
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise head(String url, Tree request) {
+		return head(url, request, null);
 	}
 
 	/**
@@ -245,7 +361,23 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise head(String url, Consumer<RequestParams> configurator) {
-		return execute(url, "HEAD", configurator);
+		return head(url, null, configurator);
+	}
+
+	/**
+	 * Executes an HTTP HEAD request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request parameters in a Tree
+	 * @param configurator
+	 *            Consumer for set the parameters of the request
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise head(String url, Tree request, Consumer<RequestParams> configurator) {
+		return execute(url, "HEAD", new TreeConfigurator(configurator, request, false));
 	}
 
 	/**
@@ -298,8 +430,8 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * 
 	 * @return {@link Promise}
 	 */
-	public Promise post(String url, Consumer<RequestParams> params) {
-		return post(url, (Tree) null, params);
+	public Promise post(String url, Consumer<RequestParams> request) {
+		return post(url, (Tree) null, request);
 	}
 
 	/**
@@ -343,7 +475,35 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise put(String url) {
-		return put(url, null);
+		return put(url, (Tree) null, null);
+	}
+
+	/**
+	 * Executes an HTTP PUT request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request body as PacketStream
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise put(String url, Tree request) {
+		return put(url, request, null);
+	}
+
+	/**
+	 * Executes an HTTP PUT request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request body as PacketStream
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise put(String url, PacketStream request) {
+		return put(url, request, null);
 	}
 
 	/**
@@ -357,7 +517,39 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise put(String url, Consumer<RequestParams> configurator) {
-		return execute(url, "PUT", configurator);
+		return put(url, (Tree) null, configurator);
+	}
+
+	/**
+	 * Executes an HTTP PUT request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request body as Tree
+	 * @param configurator
+	 *            Consumer for set the parameters of the request
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise put(String url, Tree request, Consumer<RequestParams> configurator) {
+		return execute(url, "PUT", new TreeConfigurator(configurator, request, true));
+	}
+
+	/**
+	 * Executes an HTTP PUT request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request body as PacketStream
+	 * @param configurator
+	 *            Consumer for set the parameters of the request
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise put(String url, PacketStream request, Consumer<RequestParams> configurator) {
+		return execute(url, "PUT", new PacketStreamConfigurator(configurator, request));
 	}
 
 	/**
@@ -369,7 +561,21 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise delete(String url) {
-		return delete(url, null);
+		return delete(url, null, null);
+	}
+
+	/**
+	 * Executes an HTTP DELETE request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request body as Tree
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise delete(String url, Tree request) {
+		return delete(url, request, null);
 	}
 
 	/**
@@ -383,7 +589,23 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise delete(String url, Consumer<RequestParams> configurator) {
-		return execute(url, "DELETE", configurator);
+		return delete(url, null, configurator);
+	}
+
+	/**
+	 * Executes an HTTP DELETE request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request body as Tree
+	 * @param configurator
+	 *            Consumer for set the parameters of the request
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise delete(String url, Tree request, Consumer<RequestParams> configurator) {
+		return execute(url, "DELETE", new TreeConfigurator(configurator, request, true));
 	}
 
 	/**
@@ -395,7 +617,21 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise patch(String url) {
-		return patch(url, null);
+		return patch(url, null, null);
+	}
+
+	/**
+	 * Executes an HTTP PATCH request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request body as Tree
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise patch(String url, Tree request) {
+		return patch(url, request, null);
 	}
 
 	/**
@@ -409,7 +645,23 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise patch(String url, Consumer<RequestParams> configurator) {
-		return execute(url, "PATCH", configurator);
+		return patch(url, null, configurator);
+	}
+
+	/**
+	 * Executes an HTTP PATCH request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request body as Tree
+	 * @param configurator
+	 *            Consumer for set the parameters of the request
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise patch(String url, Tree request, Consumer<RequestParams> configurator) {
+		return execute(url, "PATCH", new TreeConfigurator(configurator, request, true));
 	}
 
 	/**
@@ -421,7 +673,21 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise trace(String url) {
-		return trace(url, null);
+		return trace(url, null, null);
+	}
+
+	/**
+	 * Executes an HTTP TRACE request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request body as Tree
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise trace(String url, Tree request) {
+		return trace(url, request, null);
 	}
 
 	/**
@@ -435,27 +701,58 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise trace(String url, Consumer<RequestParams> configurator) {
-		return execute(url, "TRACE", configurator);
+		return trace(url, null, configurator);
+	}
+
+	/**
+	 * Executes an HTTP TRACE request.
+	 *
+	 * @param url
+	 *            A well formed URL.
+	 * @param request
+	 *            Request body as Tree
+	 * @param configurator
+	 *            Consumer for set the parameters of the request
+	 * 
+	 * @return {@link Promise}
+	 */
+	public Promise trace(String url, Tree request, Consumer<RequestParams> configurator) {
+		return execute(url, "TRACE", new TreeConfigurator(configurator, request, true));
 	}
 
 	// --- WEBSOCKET LISTENER / RECEIVER ---
 
-	public WebSocketConnection ws(String url) {
+	public WebSocketConnection ws(String url, WebSocketHandler handler) {
+		return ws(url, handler, null);
+	}
+
+	public WebSocketConnection ws(String url, WebSocketHandler handler, Consumer<WebSocketParams> configurator) {
+		return ws(url, handler, null, true);
+	}
+
+	public WebSocketConnection ws(String url, WebSocketHandler handler, Consumer<WebSocketParams> configurator,
+			boolean autoConnect) {
 		String wsUrl = url.startsWith("http") ? "ws" + url.substring(4) : url;
-		return new WebSocketConnection(this, wsUrl);
+		WebSocketConnection ws = new WebSocketConnection(this, wsUrl, Objects.requireNonNull(handler), configurator);
+		if (autoConnect) {
+			ws.connect();
+		}
+		return ws;
 	}
 
 	// --- COMMON HTTP-METHOD EXECUTOR ---
 
 	protected Promise execute(String url, String method, Consumer<RequestParams> configurator) {
-		RequestParams params = new RequestParams(method,
-				client.getConfig().isDisableUrlEncodingForBoundRequests());
+		RequestParams params = new RequestParams(method, client.getConfig().isDisableUrlEncodingForBoundRequests());
 		params.setUrl(url);
 		if (signatureCalculator != null) {
 			params.setSignatureCalculator(signatureCalculator);
 		}
 		if (configurator != null) {
 			configurator.accept(params);
+		}
+		if (params.handler == null) {
+			params.handler = new ResponseToJson(params);
 		}
 		return new Promise(res -> {
 			client.executeRequest(params.build(), new AsyncHandler<Void>() {
@@ -514,10 +811,36 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 		});
 	}
 
-	// --- SETTERS ---
+	// --- COMPONENT GETTERS ---
 
-	public void setSignatureCalculator(SignatureCalculator signatureCalculator) {
+	protected AsyncHttpClient getAsyncHttpClient() {
+		return client;
+	}
+
+	protected ScheduledExecutorService getScheduler() {
+		if (scheduler == null) {
+			scheduler = client.getEventLoopGroup();
+			if (scheduler == null) {
+				scheduler = Executors.newSingleThreadScheduledExecutor();
+				shutDownThreadPools = true;
+			}
+		}
+		return scheduler;
+	}
+
+	// --- BUILDER-LIKE PROPERTY SETTERS ---
+
+	/**
+	 * Set the default signature calculator.
+	 * 
+	 * @param signatureCalculator
+	 *            signature calculator
+	 * 
+	 * @return this builder (for method chaining)
+	 */
+	public DefaultAsyncHttpClientConfig.Builder setSignatureCalculator(SignatureCalculator signatureCalculator) {
 		this.signatureCalculator = signatureCalculator;
+		return this;
 	}
 
 }

@@ -34,6 +34,9 @@ import org.asynchttpclient.HttpResponseStatus;
 import io.datatree.Tree;
 import io.netty.handler.codec.http.HttpHeaders;
 
+/**
+ * Base class for response parsers (JSON, byte-array, etc).
+ */
 public abstract class ResponseHandler implements AsyncHandler<Tree> {
 
 	// --- VARIABLES ---
@@ -41,7 +44,6 @@ public abstract class ResponseHandler implements AsyncHandler<Tree> {
 	protected final RequestParams params;
 		
 	protected volatile int status = 200;
-	
 	protected volatile HttpHeaders httpHeaders;
 		
 	// --- CONSTRUCTOR ---

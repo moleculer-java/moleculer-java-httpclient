@@ -24,8 +24,6 @@
  */
 package services.moleculer.httpclient;
 
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -33,6 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.ws.WebSocket;
 import org.asynchttpclient.ws.WebSocketListener;
 import org.asynchttpclient.ws.WebSocketUpgradeHandler;
@@ -43,6 +42,39 @@ import io.datatree.Promise;
 import io.datatree.Tree;
 import services.moleculer.util.CheckedTree;
 
+/**
+ * WebSocket message receiver with built-in heartbeat function.
+ * Basic usage with auto connection:
+ * 
+ * <pre>
+ * client.ws("ws://server/path", msg -> {
+ * 
+ *     // Message received; "msg" is a JSON structure
+ *     String value = msg.get("key", "defaultValue");
+ * 
+ * });
+ * </pre>
+ * 
+ * Advanced usage; WebSocket client with custom parameters:
+ * 
+ * <pre>
+ * WebSocketConnection ws = client.ws("ws://server/path", msg -> {
+ * 
+ *     // Message received; "msg" is a JSON structure
+ *     String value = msg.get("key", "defaultValue");
+ * 
+ * }, params -> {
+ * 
+ *     // Configure connection
+ *     params.setHeartbeatInterval(60);
+ *     params.setHeader("key", "value");
+ * 
+ * }, false);
+ * 
+ * // Create connection
+ * ws.connect();
+ * </pre> 
+ */
 public class WebSocketConnection {
 
 	// --- LOGGER ---
@@ -53,6 +85,8 @@ public class WebSocketConnection {
 
 	protected final HttpClient httpClient;
 	protected final String url;
+	protected final WebSocketHandler handler;
+	protected final Consumer<WebSocketParams> configurator;
 
 	protected final AtomicReference<WebSocket> webSocket = new AtomicReference<>();
 	protected final AtomicReference<ScheduledFuture<?>> reconnectTimer = new AtomicReference<>();
@@ -64,107 +98,16 @@ public class WebSocketConnection {
 	protected final AtomicLong submittedAt = new AtomicLong();
 	protected final AtomicLong receivedAt = new AtomicLong();
 
-	protected int heartbeatInterval = 30;
-	protected int heartbeatTimeout = 10;
-
-	// --- LISTENERS ---
-
-	protected final HashMap<Consumer<Tree>, WebSocketListener> messageListeners = new HashMap<>();
-	protected final HashSet<WebSocketListener> connectionListeners = new HashSet<>();
+	protected WebSocketParams params;
 
 	// --- CONSTRUCTOR ---
 
-	protected WebSocketConnection(HttpClient httpClient, String url) {
+	protected WebSocketConnection(HttpClient httpClient, String url, WebSocketHandler handler,
+			Consumer<WebSocketParams> configurator) {
 		this.httpClient = httpClient;
 		this.url = url;
-	}
-
-	// --- ADD / REMOVE LISTENER ---
-
-	public WebSocketConnection addWebSocketListener(WebSocketListener listener) {
-		checkConnection();
-		connectionListeners.add(listener);
-		return this;
-	}
-
-	public WebSocketConnection removeWebSocketListener(WebSocketListener listener) {
-		checkConnection();
-		connectionListeners.remove(listener);
-		return this;
-	}
-
-	public WebSocketConnection addMessageListener(Consumer<Tree> listener) {
-		checkConnection();
-		if (!messageListeners.containsKey(listener)) {
-			messageListeners.put(listener, new WebSocketListener() {
-
-				StringBuilder buffer = new StringBuilder();
-
-				@Override
-				public final void onOpen(WebSocket websocket) {
-
-					// Do nothing
-				}
-
-				@Override
-				public final void onError(Throwable t) {
-
-					// Do nothing
-				}
-
-				@Override
-				public final void onClose(WebSocket websocket, int code, String reason) {
-
-					// Do nothing
-				}
-
-				@Override
-				public final void onTextFrame(String payload, boolean finalFragment, int rsv) {
-					if (closed.get()) {
-						return;
-					}
-					if (payload != null) {
-						buffer.append(payload);
-					}
-					if (finalFragment) {
-						String content = buffer.toString();
-						buffer.setLength(0);
-						Tree data = null;
-						if (content.length() > 0) {
-							char c = content.charAt(0);
-							if (c == '!') {
-								return;
-							}
-							if (c == '{' || c == '[') {
-								try {
-									data = new Tree(content);
-								} catch (Exception cause) {
-									logger.warn("Unable to parse JSON!", cause);
-								}
-							}
-							if (data == null) {
-								data = new CheckedTree(content);
-							}
-							listener.accept(data);
-						}
-					}
-				}
-
-			});
-		}
-		return this;
-	}
-
-	public WebSocketConnection removeMessageListener(Consumer<Tree> listener) {
-		checkConnection();
-		messageListeners.remove(listener);
-		return this;
-	}
-
-	protected void checkConnection() {
-		if (webSocket.get() != null) {
-			throw new IllegalStateException("The connection has already been opened!");
-		}
+		this.handler = handler;
+		this.configurator = configurator;
 	}
 
 	// --- CONNECT ---
@@ -183,14 +126,23 @@ public class WebSocketConnection {
 
 	protected void openConnection() {
 		logger.info("Connecting to " + url + "...");
+
+		// Create "params" and invoke Configurator
+		AsyncHttpClient client = httpClient.getAsyncHttpClient();
+		params = new WebSocketParams(client.getConfig().isDisableUrlEncodingForBoundRequests());
+		params.setUrl(url);
+		if (httpClient.signatureCalculator != null) {
+			params.setSignatureCalculator(httpClient.signatureCalculator);
+		}
+		if (configurator != null) {
+			configurator.accept(params);
+		}
+
+		// Create upgrade handler
 		WebSocketUpgradeHandler.Builder upgradeHandlerBuilder = new WebSocketUpgradeHandler.Builder();
-		for (WebSocketListener listener : connectionListeners) {
-			upgradeHandlerBuilder.addWebSocketListener(listener);
-		}
-		for (WebSocketListener listener : messageListeners.values()) {
-			upgradeHandlerBuilder.addWebSocketListener(listener);
-		}
 		upgradeHandlerBuilder.addWebSocketListener(new WebSocketListener() {
+
+			StringBuilder buffer = new StringBuilder();
 
 			@Override
 			public final void onOpen(WebSocket websocket) {
@@ -205,7 +157,7 @@ public class WebSocketConnection {
 				reconnectTimer.set(httpClient.getScheduler().scheduleAtFixedRate(() -> {
 
 					long now = System.currentTimeMillis();
-					if (now - submittedAt.get() > heartbeatInterval * 1000L) {
+					if (now - submittedAt.get() > params.heartbeatInterval * 1000L) {
 						WebSocket ws = webSocket.get();
 						if (ws != null) {
 							submittedAt.set(now);
@@ -213,7 +165,7 @@ public class WebSocketConnection {
 						}
 						return;
 					}
-					long heartbeatTimeoutSec = heartbeatTimeout * 1000L;
+					long heartbeatTimeoutSec = params.heartbeatTimeout * 1000L;
 					long submitted = submittedAt.get();
 					if ((submitted - receivedAt.get()) >= heartbeatTimeoutSec
 							&& (now - submitted) >= heartbeatTimeoutSec) {
@@ -221,7 +173,12 @@ public class WebSocketConnection {
 						reconnect();
 					}
 
-				}, heartbeatInterval / 3, heartbeatInterval / 3, TimeUnit.SECONDS));
+				}, params.heartbeatInterval / 3, params.heartbeatInterval / 3, TimeUnit.SECONDS));
+				try {
+					handler.onOpen(websocket);
+				} catch (Throwable userError) {
+					logger.warn("Unexpected error occured!", userError);
+				}
 				Promise previousPromise = connected.getAndSet(null);
 				if (previousPromise != null) {
 					previousPromise.complete();
@@ -247,6 +204,11 @@ public class WebSocketConnection {
 					msg = "Unexpected error occured!";
 				}
 				logger.error(msg, cause);
+				try {
+					handler.onError(cause);
+				} catch (Throwable userError) {
+					logger.warn("Unexpected error occured!", userError);
+				}
 				Promise previousPromise = connected.getAndSet(null);
 				if (previousPromise != null) {
 					previousPromise.complete(cause);
@@ -256,6 +218,11 @@ public class WebSocketConnection {
 
 			@Override
 			public final void onClose(WebSocket websocket, int code, String reason) {
+				try {
+					handler.onClose(websocket, code, reason);
+				} catch (Throwable userError) {
+					logger.warn("Unexpected error occured!", userError);
+				}
 				Promise previousPromise = disconnected.getAndSet(null);
 				if (previousPromise != null) {
 					previousPromise.complete();
@@ -268,13 +235,59 @@ public class WebSocketConnection {
 				if (closed.get()) {
 					return;
 				}
-				if (finalFragment && payload != null && payload.equals("!")) {
-					receivedAt.set(System.currentTimeMillis());
+				if (payload != null) {
+					buffer.append(payload);
+				}
+				if (finalFragment) {
+					String content = buffer.toString();
+					buffer.setLength(0);
+					if ("!".equals(content)) {
+						receivedAt.set(System.currentTimeMillis());
+						return;
+					}
+					Tree data = null;
+					if (content.length() > 0) {
+						char c = content.charAt(0);
+						if (c == '!') {
+							return;
+						}
+						if (c == '{' || c == '[') {
+							try {
+								data = new Tree(content);
+							} catch (Exception cause) {
+								logger.warn("Unable to parse JSON!", cause);
+							}
+						}
+						if (data == null) {
+							data = new CheckedTree(content);
+						}
+						handler.onMessage(data);
+					}
 				}
 			}
 
 		});
-		httpClient.client.prepareGet(url).execute(upgradeHandlerBuilder.build());
+
+		// Conntent to server
+		client.executeRequest(params.build(), upgradeHandlerBuilder.build());
+	}
+
+	/**
+	 * Waiting for "connected" status.
+	 * 
+	 * @param timeout
+	 *            the maximum time to wait
+	 * @param unit
+	 *            the time unit of the timeout argument
+	 * 
+	 * @throws Exception
+	 *             any (interruption, execution, user-level, etc.) exception
+	 */
+	public void waitForConnection(long timeout, TimeUnit unit) throws Exception {
+		Promise promise = connected.get();
+		if (promise != null) {
+			promise.waitFor(timeout, unit);
+		}
 	}
 
 	// --- DISCONNECT ---
@@ -320,18 +333,9 @@ public class WebSocketConnection {
 	protected void reconnect() {
 		closeConnection(webSocket.getAndSet(null));
 		if (!closed.get()) {
-			reconnectTimer.set(httpClient.getScheduler().schedule(this::openConnection, 3, TimeUnit.SECONDS));
+			reconnectTimer.set(
+					httpClient.getScheduler().schedule(this::openConnection, params.reconnectDelay, TimeUnit.SECONDS));
 		}
-	}
-
-	// --- SETTERS ---
-
-	public void setHeartbeatInterval(int heartbeatInterval) {
-		this.heartbeatInterval = heartbeatInterval;
-	}
-
-	public void setHeartbeatTimeout(int heartbeatTimeout) {
-		this.heartbeatTimeout = heartbeatTimeout;
 	}
 
 }

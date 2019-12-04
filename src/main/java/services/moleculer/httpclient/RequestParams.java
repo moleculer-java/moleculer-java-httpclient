@@ -30,43 +30,74 @@ import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 
 import org.asynchttpclient.AsyncHandler;
-import org.asynchttpclient.BoundRequestBuilder;
 import org.asynchttpclient.RequestBuilderBase;
 
 import io.datatree.Tree;
 import services.moleculer.stream.PacketStream;
 
-public class RequestParams extends RequestBuilderBase<BoundRequestBuilder> {
+/**
+ * Builder for a HTTTP request. Usage:
+ * 
+ * <pre>
+ * client.post("http://server/path", params -> {
+ * 
+ *    // Set request parameters:
+ *    params.returnAsByteArray();
+ *    params.setHeader("name", "value");
+ *    // ...
+ * 
+ * }).then(rsp -> {
+ * 
+ *    // Success; response in the "rsp" object
+ * 
+ * }).catchError(err -> {
+ *
+ *    // Request failed; "err" is a Throwable
+ * 
+ * });
+ * </pre>
+ */
+public class RequestParams extends RequestBuilderBase<RequestParams> {
 
 	// --- VARIABLES ---
-	
+
 	/**
 	 * Copy HTTP response status into the Meta structure of the response Tree.
 	 */
 	protected boolean returnStatusCode;
-	
+
 	/**
 	 * Copy HTTP response headers into the Meta structure of the response Tree.
 	 */
 	protected boolean returnHttpHeaders;
-	
+
+	/**
+	 * Output handler / parser.
+	 */
 	protected AsyncHandler<?> handler;
-		
+
 	/**
 	 * Do not parse response as JSON, just return the response body in a
 	 * byte-array.
 	 */
 	protected boolean returnBytes;
-	
+
 	// --- CONSTRUCTOR ---
-	
+
 	protected RequestParams(String method, boolean isDisableUrlEncoding) {
 		super(method, isDisableUrlEncoding);
-		handler = new ResponseToJson(this);
 	}
 
 	// --- SET JSON BODY AS TREE ---
 
+	/**
+	 * Set the request body by the specified Tree (~= JSON object).
+	 * 
+	 * @param data
+	 *            input JSON structure
+	 * 
+	 * @return this builder (for method chaining)
+	 */
 	public RequestParams setBody(Tree data) {
 		if (data != null) {
 			setBody(data.toBinary());
@@ -76,34 +107,87 @@ public class RequestParams extends RequestBuilderBase<BoundRequestBuilder> {
 
 	// --- SET BINARY BODY AS MOLECULER STREAM ---
 
+	/**
+	 * Read request body from the specified PacketStream. The Content-Length is
+	 * unknown. Executes a chunked HTTP-request, without "Content-Length"
+	 * header.
+	 * 
+	 * @param stream
+	 *            source PacketStream
+	 * 
+	 * @return this builder (for method chaining)
+	 */
 	public RequestParams setBody(PacketStream stream) {
 		return setBody(stream, -1L);
 	}
 
+	/**
+	 * Read request body from the specified PacketStream. Executes a normal
+	 * HTTP-request, with "Content-Length" header.
+	 * 
+	 * @param stream
+	 *            source PacketStream
+	 * @param contentLength
+	 *            length of the content (in bytes)
+	 * 
+	 * @return this builder (for method chaining)
+	 */
 	public RequestParams setBody(PacketStream stream, long contentLength) {
 		if (stream != null) {
 			setBody(new PacketStreamBodyGenerator(stream, contentLength));
 		}
 		return this;
 	}
-	
+
 	// --- SET OUTPUT TARGETS ---
 
+	/**
+	 * Redirect response to the specified AsyncHandler.
+	 * 
+	 * @param target
+	 *            target AsyncHandler
+	 * 
+	 * @return this builder (for method chaining)
+	 */
 	public RequestParams transferTo(AsyncHandler<?> target) {
 		handler = target;
 		return this;
 	}
-	
+
+	/**
+	 * Redirect response into the specified PacketStream.
+	 * 
+	 * @param target
+	 *            target PacketStream
+	 * 
+	 * @return this builder (for method chaining)
+	 */
 	public RequestParams transferTo(PacketStream target) {
 		this.handler = new ResponseToPacketStream(this, target);
 		return this;
 	}
-	
+
+	/**
+	 * Redirect response into the specified OutputStream.
+	 * 
+	 * @param target
+	 *            target OutputStream
+	 * 
+	 * @return this builder (for method chaining)
+	 */
 	public RequestParams transferTo(OutputStream target) {
 		this.handler = new ResponseToOutputStream(this, target);
 		return this;
 	}
 
+	/**
+	 * Redirect response into the specified WritableByteChannel.
+	 * 
+	 * @param target
+	 *            target WritableByteChannel
+	 * 
+	 * @return this builder (for method chaining)
+	 */
 	public RequestParams transferTo(WritableByteChannel target) {
 		OutputStream out = new OutputStream() {
 
@@ -131,22 +215,84 @@ public class RequestParams extends RequestBuilderBase<BoundRequestBuilder> {
 		this.handler = new ResponseToOutputStream(this, out);
 		return this;
 	}
-	
+
 	// --- BUILDER-STYLE PROPERTY SETTERS ---
 
-	public RequestParams setReturnHttpHeaders(boolean returnHttpHeaders) {
-		this.returnHttpHeaders = returnHttpHeaders;
+	/**
+	 * Copy HTTP response headers into the Meta structure of the response Tree.
+	 * Usage:
+	 * 
+	 * <pre>
+	 * client.post("http://server/path", params -> {
+	 * 	params.returnHttpHeaders();
+	 * }).then(rsp -> {
+	 * 
+	 * 	// Get response status
+	 * 	Tree headers = rsp.getMeta().get("$headers");
+	 * 	for (Tree header : headers) {
+	 * 		String name = header.getName();
+	 * 		String value = header.asString();
+	 * 	}
+	 * 
+	 * })
+	 * </pre>
+	 * 
+	 * @return this builder (for method chaining)
+	 */
+	public RequestParams returnHttpHeaders() {
+		this.returnHttpHeaders = true;
 		return this;
 	}
-	
-	public RequestParams setReturnStatusCode(boolean returnStatusCode) {
-		this.returnStatusCode = returnStatusCode;
+
+	/**
+	 * Copy HTTP response status into the Meta structure of the response Tree.
+	 * Usage:
+	 * 
+	 * <pre>
+	 * client.post("http://server/path", params -> {
+	 * 	params.returnStatusCode();
+	 * }).then(rsp -> {
+	 * 
+	 * 	// Get response status
+	 * 	int status = rsp.getMeta().get("$status", 0);
+	 * 
+	 * })
+	 * </pre>
+	 * 
+	 * @return this builder (for method chaining)
+	 */
+	public RequestParams returnStatusCode() {
+		this.returnStatusCode = true;
 		return this;
 	}
-	
-	public RequestParams setReturnBytes(boolean returnBytes) {
-		this.returnBytes = returnBytes;
+
+	/**
+	 * Do not parse response, just return with a byte array. Usage:
+	 * 
+	 * <pre>
+	 * client.post("http://server/path", params -> {
+	 * 
+	 * 	// Do not parse the response as JSON
+	 * 	params.returnAsByteArray();
+	 * 
+	 * }).then(rsp -> {
+	 * 
+	 * 	// Success
+	 * 	byte[] bytes = rsp.asBytes();
+	 * 
+	 * }).catchError(err -> {
+	 *
+	 * 	// Failed
+	 * 	err.printStackTrace();
+	 * 
+	 * });
+	 * </pre>
+	 * 
+	 * @return this builder (for method chaining)
+	 */
+	public RequestParams returnAsByteArray() {
+		this.returnBytes = true;
 		return this;
 	}
-	
+
 }

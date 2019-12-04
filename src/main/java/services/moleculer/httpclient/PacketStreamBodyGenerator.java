@@ -31,6 +31,9 @@ import org.asynchttpclient.request.body.generator.FeedableBodyGenerator;
 import io.netty.buffer.ByteBuf;
 import services.moleculer.stream.PacketStream;
 
+/**
+ * PacketStream-based HTTP body generator.
+ */
 public class PacketStreamBodyGenerator implements FeedableBodyGenerator {
 
 	// --- VARIABLES ---

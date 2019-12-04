@@ -31,6 +31,9 @@ import org.asynchttpclient.Param;
 
 import io.datatree.Tree;
 
+/**
+ * Configurator for Tree/JSON-based requests.
+ */
 public class TreeConfigurator implements Consumer<RequestParams> {
 
 	// --- VARIABLES ---

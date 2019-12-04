@@ -24,50 +24,22 @@
  */
 package services.moleculer.httpclient;
 
-import java.nio.ByteBuffer;
-
-import org.asynchttpclient.HttpResponseBodyPart;
+import org.asynchttpclient.ws.WebSocket;
 
 import io.datatree.Tree;
-import services.moleculer.util.CheckedTree;
 
-/**
- * Returns the response in a byte-array.
- */
-public class ResponseToBytes extends ResponseHandler {
+@FunctionalInterface
+public interface WebSocketHandler {
 
-	// --- VARIABLES ---
-	
-	protected byte[] bytes;
-	
-	// --- CONSTRUCTOR ---
+	void onMessage(Tree message);
 
-	protected ResponseToBytes(RequestParams params) {
-		super(params);
-	}
-	
-	// --- REQUEST PROCESSORS ---
-	
-	@Override
-	public State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
-		ByteBuffer buffer = bodyPart.getBodyByteBuffer();
-		int len = buffer.capacity();
-		if (bytes == null) {
-			bytes = new byte[len];
-			buffer.get(bytes, 0, len);
-		} else {
-			byte[] expanded = new byte[bytes.length + len];
-			System.arraycopy(bytes, 0, expanded, 0, bytes.length);
-			buffer.get(expanded, bytes.length, len);
-		}
-		return State.CONTINUE;
+	default void onOpen(WebSocket webSocket) {
 	}
 
-	@Override
-	public Tree onCompleted() throws Exception {
-		Tree rsp = new CheckedTree(bytes);
-		addStatusAndHeaders(rsp);
-		return rsp;
+	default void onError(Throwable t) {
+	}
+
+	default void onClose(WebSocket webSocket, int code, String reason) {
 	}
 
 }

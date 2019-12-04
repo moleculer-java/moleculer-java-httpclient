@@ -35,7 +35,7 @@ public class Sample {
 			// Init client
 			HttpClient client = new HttpClient();
 			client.start();
-			
+						
 			// Create JSON request (=POST body)
 			Tree req = new Tree().put("key", "value");
 

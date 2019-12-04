@@ -33,6 +33,9 @@ import org.asynchttpclient.request.body.generator.FeedListener;
 import io.netty.buffer.ByteBuf;
 import services.moleculer.stream.PacketStream;
 
+/**
+ * PacketStream-based request body.
+ */
 public class PacketStreamBody implements Body {
 
 	// --- VARIABLES ---

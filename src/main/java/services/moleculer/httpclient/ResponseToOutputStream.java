@@ -32,21 +32,24 @@ import org.asynchttpclient.HttpResponseBodyPart;
 
 import io.datatree.Tree;
 
+/**
+ * Redirects response into the specific OutputStream (eg. into file, database
+ * blob, etc).
+ */
 public class ResponseToOutputStream extends ResponseHandler {
 
 	// --- VARIABLES ---
 
 	protected final OutputStream target;
-	
 	protected final AtomicLong transfered = new AtomicLong();
-	
+
 	// --- CONSTRUCTOR ---
 
 	protected ResponseToOutputStream(RequestParams params, OutputStream target) {
 		super(params);
 		this.target = target;
 	}
-	
+
 	// --- REQUEST PROCESSORS ---
 
 	@Override
@@ -82,5 +85,5 @@ public class ResponseToOutputStream extends ResponseHandler {
 			}
 		}
 	}
-	
+
 }

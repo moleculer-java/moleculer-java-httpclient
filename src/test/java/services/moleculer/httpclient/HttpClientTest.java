@@ -26,11 +26,11 @@ package services.moleculer.httpclient;
 
 import java.io.ByteArrayOutputStream;
 import java.util.Iterator;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.asynchttpclient.ws.WebSocket;
-import org.asynchttpclient.ws.WebSocketListener;
 import org.junit.Test;
 
 import io.datatree.Promise;
@@ -162,8 +162,7 @@ public class HttpClientTest extends TestCase {
 
 		Tree req = new Tree().put("a", 1).put("b", true).put("c", "d");
 		Tree rsp = cl.get(TEST_URL, req, params -> {
-			params.setReturnHttpHeaders(true);
-			params.setReturnStatusCode(true);
+			params.returnHttpHeaders().returnStatusCode();
 		}).waitFor();
 
 		Context ctx = reset();
@@ -174,7 +173,7 @@ public class HttpClientTest extends TestCase {
 		assertEquals("GET", ctx.params.getMeta().get("method", ""));
 
 		rsp = cl.post(TEST_URL, req, params -> {
-			params.setReturnHttpHeaders(true).setReturnStatusCode(true);
+			params.returnHttpHeaders().returnStatusCode();
 		}).waitFor();
 
 		ctx = reset();
@@ -194,15 +193,16 @@ public class HttpClientTest extends TestCase {
 		boolean[] con = new boolean[1];
 
 		// Connect via WebSocket
-		WebSocketConnection ws = cl.ws("http://127.0.0.1:8080/ws/test");
-		ws.addMessageListener(msg -> {
-			System.out.println("WebSocket message received: " + msg);
-			arr[0] = msg;
-		});
-		ws.addWebSocketListener(new WebSocketListener() {
+		WebSocketConnection ws = cl.ws("http://127.0.0.1:8080/ws/test", new WebSocketHandler() {
+			
+			@Override
+			public void onMessage(Tree message) {
+				System.out.println("WebSocket message received: " + message);
+				arr[0] = message;
+			}
 
 			@Override
-			public void onOpen(WebSocket websocket) {
+			public void onOpen(WebSocket webSocket) {
 				con[0] = true;
 				System.out.println("Connected.");
 			}
@@ -213,13 +213,13 @@ public class HttpClientTest extends TestCase {
 			}
 
 			@Override
-			public void onClose(WebSocket websocket, int code, String reason) {
+			public void onClose(WebSocket webSocket, int code, String reason) {
 				con[0] = false;
 				System.out.println("Disconnected");
 			}
-
-		});
-		ws.connect().waitFor(1000);
+			
+		});	
+		ws.waitForConnection(20, TimeUnit.SECONDS);
 		assertTrue(con[0]);
 
 		// Send a test WebSocket packet (server -> client)

@@ -24,50 +24,55 @@
  */
 package services.moleculer.httpclient;
 
-import java.nio.ByteBuffer;
-
-import org.asynchttpclient.HttpResponseBodyPart;
-
-import io.datatree.Tree;
-import services.moleculer.util.CheckedTree;
+import org.asynchttpclient.RequestBuilderBase;
 
 /**
- * Returns the response in a byte-array.
+ * WebSocket message receiver with built-in heartbeat function. Usage:
+ * 
+ * <pre>
+ * client.ws("ws://server/path", msg -> {
+ * 
+ *     // Message received; "msg" is a JSON structure
+ *     String value = msg.get("key", "defaultValue");
+ * 
+ * }, params -> {
+ * 
+ *     // Configure connection
+ *     params.setHeartbeatInterval(60);
+ *     params.setHeader("key", "value");
+ * 
+ * });
+ * </pre>
  */
-public class ResponseToBytes extends ResponseHandler {
+public class WebSocketParams extends RequestBuilderBase<WebSocketParams> {
 
-	// --- VARIABLES ---
+	// --- TIMEOUTS (IN SECONDS) ---
 	
-	protected byte[] bytes;
+	protected int heartbeatInterval = 60;
+	protected int heartbeatTimeout = 10;
+	protected int reconnectDelay = 3;
 	
 	// --- CONSTRUCTOR ---
 
-	protected ResponseToBytes(RequestParams params) {
-		super(params);
+	protected WebSocketParams(boolean isDisableUrlEncoding) {
+		super("GET", isDisableUrlEncoding);
 	}
 	
-	// --- REQUEST PROCESSORS ---
+	// --- SETTERS ---
+
+	public WebSocketParams setHeartbeatInterval(int heartbeatInterval) {
+		this.heartbeatInterval = heartbeatInterval;
+		return this;
+	}
+
+	public WebSocketParams setHeartbeatTimeout(int heartbeatTimeout) {
+		this.heartbeatTimeout = heartbeatTimeout;
+		return this;
+	}
+
+	public WebSocketParams setReconnectDelay(int reconnectDelay) {
+		this.reconnectDelay = reconnectDelay;
+		return this;
+	}
 	
-	@Override
-	public State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
-		ByteBuffer buffer = bodyPart.getBodyByteBuffer();
-		int len = buffer.capacity();
-		if (bytes == null) {
-			bytes = new byte[len];
-			buffer.get(bytes, 0, len);
-		} else {
-			byte[] expanded = new byte[bytes.length + len];
-			System.arraycopy(bytes, 0, expanded, 0, bytes.length);
-			buffer.get(expanded, bytes.length, len);
-		}
-		return State.CONTINUE;
-	}
-
-	@Override
-	public Tree onCompleted() throws Exception {
-		Tree rsp = new CheckedTree(bytes);
-		addStatusAndHeaders(rsp);
-		return rsp;
-	}
-
 }

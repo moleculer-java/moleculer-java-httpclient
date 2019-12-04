@@ -4,3 +4,27 @@
 
 # (WIP) moleculer-java-httpclient
 Non-blocking, Promise-based HTTP client for Moleculer Applications.
+
+```java
+// Create HTTP client (connection pool and timeout handler)
+HttpClient client = new HttpClient();
+client.start();
+
+// Build JSON request
+Tree req = new Tree();
+req.put("key1", "value1");
+req.put("key2", 123);
+req.put("key3", true);
+
+client.post("http://host/path", req).then(rsp -> {
+
+    // Success (process JSON response)
+    String value4 = rsp.get("key4", "defaultValue");
+
+}).catchError(err -> {
+
+    // Failed
+    err.printStackTrace();
+
+});
+```

@@ -72,6 +72,8 @@ public abstract class ResponseHandler implements AsyncHandler<Tree> {
 
 	@Override
 	public void onThrowable(Throwable t) {
+		
+		// Do nothing
 	}
 	
 	protected void addStatusAndHeaders(Tree rsp) {

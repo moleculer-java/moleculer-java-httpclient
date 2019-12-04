@@ -28,18 +28,60 @@ import org.asynchttpclient.ws.WebSocket;
 
 import io.datatree.Tree;
 
+/**
+ * WebSocket message receiver. Simple usage:
+ * 
+ * <pre>
+ * client.ws("ws://server/path", msg -> {
+ * 
+ *     // Message received; "msg" is a JSON structure
+ *     String value = msg.get("key", "defaultValue");
+ * 
+ * });
+ * </pre>
+ * 
+ * Advanced usage:
+ * 
+ * <pre>
+ * client.ws("ws://server/path", new WebSocketHandler() {
+ * 
+ *     public void onMessage(Tree message) {
+ *        // Message received
+ *     }
+ * 
+ *     public void onOpen(WebSocket webSocket) {
+ *        // WebSocket opened
+ *     }
+ * 
+ *     public void onError(Throwable t) {
+ *        // Error occured
+ *     }
+ * 
+ *     public void onClose(WebSocket webSocket, int code, String reason) {
+ *        // WebSocket closed
+ *     }
+ * 
+ * });
+ * </pre>
+ */
 @FunctionalInterface
 public interface WebSocketHandler {
 
 	void onMessage(Tree message);
 
 	default void onOpen(WebSocket webSocket) {
+		
+		// Optional code
 	}
 
 	default void onError(Throwable t) {
+
+		// Optional code
 	}
 
 	default void onClose(WebSocket webSocket, int code, String reason) {
+		
+		// Optional code		
 	}
 
 }

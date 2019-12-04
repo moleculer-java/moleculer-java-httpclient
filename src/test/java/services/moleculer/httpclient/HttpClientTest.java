@@ -128,11 +128,11 @@ public class HttpClientTest extends TestCase {
 
 	protected static class StreamReceiver extends Service {
 
-		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-		AtomicBoolean closed = new AtomicBoolean();
-		AtomicReference<Throwable> error = new AtomicReference<>();
+		public ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+		public AtomicBoolean closed = new AtomicBoolean();
+		public AtomicReference<Throwable> error = new AtomicReference<>();
 
-		Action receive = ctx -> {
+		public Action receive = ctx -> {
 			Promise res = new Promise();
 			if (ctx.stream == null) {
 				res.complete(new IllegalArgumentException("missing stream"));
@@ -217,6 +217,14 @@ public class HttpClientTest extends TestCase {
 				con[0] = false;
 				System.out.println("Disconnected");
 			}
+			
+		}, params -> {
+			
+			params.setHeartbeatInterval(30);
+			params.setHeartbeatTimeout(10);
+			params.setReconnectDelay(5);
+			
+			params.setHeader("CustomHeader", "CustomValue");
 			
 		});	
 		ws.waitForConnection(20, TimeUnit.SECONDS);

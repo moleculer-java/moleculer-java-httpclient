@@ -380,17 +380,17 @@ public class HttpClientTest extends TestCase {
 			params.transferTo(new AsyncHandler<Void>() {
 
 				@Override
-				public org.asynchttpclient.AsyncHandler.State onStatusReceived(HttpResponseStatus responseStatus)
+				public State onStatusReceived(HttpResponseStatus responseStatus)
 						throws Exception {
 					return State.CONTINUE;				}
 
 				@Override
-				public org.asynchttpclient.AsyncHandler.State onHeadersReceived(HttpHeaders headers) throws Exception {
+				public State onHeadersReceived(HttpHeaders headers) throws Exception {
 					return State.CONTINUE;
 				}
 
 				@Override
-				public org.asynchttpclient.AsyncHandler.State onBodyPartReceived(HttpResponseBodyPart bodyPart)
+				public State onBodyPartReceived(HttpResponseBodyPart bodyPart)
 						throws Exception {
 					invoked.set(true);
 					return State.CONTINUE;
@@ -398,6 +398,8 @@ public class HttpClientTest extends TestCase {
 
 				@Override
 				public void onThrowable(Throwable t) {
+					
+					// Do nothing
 				}
 
 				@Override

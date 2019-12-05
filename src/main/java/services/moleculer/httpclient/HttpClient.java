@@ -692,7 +692,11 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 			configurator.accept(params);
 		}
 		if (params.handler == null) {
-			params.handler = new ResponseToJson(params);
+			if (params.returnBytes) {
+				params.handler = new ResponseToBytes(params);
+			} else {
+				params.handler = new ResponseToJson(params);				
+			}
 		}		
 		return new Promise(res -> {
 			client.executeRequest(params.build(), new AsyncHandler<Void>() {

@@ -25,17 +25,25 @@
 package services.moleculer.httpclient;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import org.asynchttpclient.AsyncHandler;
+import org.asynchttpclient.HttpResponseBodyPart;
+import org.asynchttpclient.HttpResponseStatus;
 import org.asynchttpclient.ws.WebSocket;
 import org.junit.Test;
 
 import io.datatree.Promise;
 import io.datatree.Tree;
+import io.netty.handler.codec.http.HttpHeaders;
 import junit.framework.TestCase;
 import services.moleculer.ServiceBroker;
 import services.moleculer.config.ServiceBrokerConfig;
@@ -317,12 +325,119 @@ public class HttpClientTest extends TestCase {
 		check("POST", null, true, cl.post(TEST_URL, returnAll));
 		check("POST", req, true, cl.post(TEST_URL, req, returnAll));
 
+		// Send stream
+		PacketStream stream = br.createStream();		
+		Promise p = cl.post(TEST_URL, stream);
+		stream.sendData(req.toBinary());
+		stream.sendClose();
+		checkStream("POST", req, false, p);
+		
+		// Send stream
+		stream = br.createStream();
+		p = cl.post(TEST_URL, stream, returnAll);
+		stream.sendData(req.toBinary());
+		stream.sendClose();
+		checkStream("POST", req, true, p);
+
+		// Transfer to...
+		ByteArrayOutputStream buff = new ByteArrayOutputStream();
+		String s1 = req.toString(null, false, false);
+		rsp = cl.post(TEST_URL, req, params -> {
+			params.transferTo(buff);
+		}).waitFor(2000);
+		String s2 = new String(buff.toByteArray());
+		assertEquals(s1.replace("\"", ""), s2.replace("\"", ""));
+		
+		File file = File.createTempFile("test", ".tmp");
+		FileOutputStream fos = new FileOutputStream(file);
+		FileChannel channel = fos.getChannel();
+		rsp = cl.post(TEST_URL, params -> {
+			params.transferTo(channel);
+			params.setBody(req);
+		}).waitFor(2000);
+		RandomAccessFile raf = new RandomAccessFile(file, "r");
+		byte[] bytes = new byte[(int) raf.length()];
+		raf.readFully(bytes);
+		raf.close();
+		file.delete();
+		assertFalse(file.isFile());
+		s2 = new String(bytes);
+		assertEquals(s1.replace("\"", ""), s2.replace("\"", ""));
+		fos.close();
+
+		PacketStream ps = br.createStream();
+		rsp = cl.post(TEST_URL, params -> {
+			params.transferTo(ps);
+			params.setBody(req);
+		}).waitFor(2000);
+		buff.reset();
+		ps.transferTo(buff).waitFor(2000);
+		s2 = new String(buff.toByteArray());
+		assertEquals(s1.replace("\"", ""), s2.replace("\"", ""));
+		
+		AtomicBoolean invoked = new AtomicBoolean();
+		rsp = cl.post(TEST_URL, params -> {
+			params.transferTo(new AsyncHandler<Void>() {
+
+				@Override
+				public org.asynchttpclient.AsyncHandler.State onStatusReceived(HttpResponseStatus responseStatus)
+						throws Exception {
+					return State.CONTINUE;				}
+
+				@Override
+				public org.asynchttpclient.AsyncHandler.State onHeadersReceived(HttpHeaders headers) throws Exception {
+					return State.CONTINUE;
+				}
+
+				@Override
+				public org.asynchttpclient.AsyncHandler.State onBodyPartReceived(HttpResponseBodyPart bodyPart)
+						throws Exception {
+					invoked.set(true);
+					return State.CONTINUE;
+				}
+
+				@Override
+				public void onThrowable(Throwable t) {
+				}
+
+				@Override
+				public Void onCompleted() throws Exception {
+					return null;
+				}
+				
+			});
+			params.setBody(req);
+		}).waitFor(2000);
+		assertTrue(invoked.get());
+		
+		// Return data as byte array (do not parse)
+		rsp = cl.post(TEST_URL, req, params -> {
+			params.returnAsByteArray();
+		}).waitFor(2000);
+		bytes = rsp.asBytes();
+		s2 = new String(bytes);
+		assertEquals(s1.replace("\"", ""), s2.replace("\"", ""));
+		
 		// PUT
 		check("PUT", null, false, cl.put(TEST_URL));
 		check("PUT", req, false, cl.put(TEST_URL, req));
 		check("PUT", null, true, cl.put(TEST_URL, returnAll));
 		check("PUT", req, true, cl.put(TEST_URL, req, returnAll));
 
+		// Send stream
+		stream = br.createStream();		
+		p = cl.put(TEST_URL, stream);
+		stream.sendData(req.toBinary());
+		stream.sendClose();
+		checkStream("PUT", req, false, p);
+		
+		// Send stream
+		stream = br.createStream();
+		p = cl.put(TEST_URL, stream, returnAll);
+		stream.sendData(req.toBinary());
+		stream.sendClose();
+		checkStream("PUT", req, true, p);
+		
 		// DELETE
 		check("DELETE", null, false, cl.delete(TEST_URL));
 		check("DELETE", req, false, cl.delete(TEST_URL, req));
@@ -343,6 +458,35 @@ public class HttpClientTest extends TestCase {
 
 	}
 
+	private void checkStream(String method, Tree request, boolean returnAll, Promise responsePromise) throws Exception {
+		long start = System.currentTimeMillis();
+		System.out.println("Testing " + method + " method...");
+		Tree rsp = responsePromise.waitFor(1000);
+		long duration = System.currentTimeMillis() - start;
+		assertTrue(duration < 100);
+		Context ctx = reset();
+		if (returnAll) {
+			assertOk(rsp);
+			assertRestResponse(rsp);
+		} else {
+			assertNull(rsp.getMeta(false));
+		}
+		assertTrue(rsp.isEmpty());
+		Tree meta = ctx.params.getMeta();
+		assertFalse(meta.isEmpty());
+		assertEquals(method, meta.get("method", ""));
+		assertTrue(meta.get("path", "").startsWith("/test.action"));
+		assertNull(meta.get("query", (String) null));
+		assertFalse(meta.get("multipart", true));
+		assertFalse(meta.get("address", "").isEmpty());
+		
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		ctx.stream.transferTo(out).waitFor(1000);
+		byte[] bytes = out.toByteArray();
+		String s = request.toString(null, false, false).replace("\"", "");
+		assertEquals(s, new String(bytes).replace("\"", ""));
+	}
+	
 	private void check(String method, Tree request, boolean returnAll, Promise responsePromise) throws Exception {
 		long start = System.currentTimeMillis();
 		System.out.println("Testing " + method + " method...");

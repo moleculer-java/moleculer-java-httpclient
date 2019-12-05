@@ -211,5 +211,48 @@ client.get("http://host/path", params -> {
 });
 ```
 
+### Upload a file
+
+The "setBody" method is used to send files or Stream content to the server.
+
+```java
+// Source file to upload
+File file = new File("/source.bin");
+		
+client.post("http://host/path", params -> {
+			
+    // Set body
+    params.setBody(file);
+
+}).then(rsp -> {
+			
+    // File uploaded
+			
+});
+```
+
+### Streaming with PacketStreams in Moleculer environment
+
+PacketStreams provide low-level push-to-data delivery. It allows you to redirect responses  of other Moleculer Actions directly to the HTTP request stream (or you can open an online media stream to the server for live microphone audio recording, etc.).
+
+```java
+// The "broker" is a Moleculer Service Broker
+ServiceBroker broker = new ServiceBroker();
+// ...
+broker.start();
+
+// Create PacketStream
+PacketStream stream = broker.createStream();
+		
+// Start sending...
+client.post("http://host/path", stream);
+		
+stream.sendData("packet1".getBytes());		
+stream.sendData("packet2".getBytes());		
+stream.sendData("packet3".getBytes());
+		
+stream.sendClose();
+```
+
 ## License
 This project is available under the [MIT license](https://tldrlegal.com/license/mit-license).

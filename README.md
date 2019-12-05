@@ -38,7 +38,7 @@ dependencies {
 
 ### Blocking usage
 
-Blocking is not recommended, but you can use the "waitFor" method to wait for the server response if necessary.
+Blocking is not recommended, but you can use the "waitFor" method to wait for the server response if necessary. The "Tree" object is practically a JSON structure. Its contents can be retrieved using "get" function calls, as in a "Map" object.
 
 ```java
 Tree rsp = client.get("http://host/rest").waitFor();

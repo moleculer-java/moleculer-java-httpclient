@@ -191,7 +191,8 @@ The "returnStatusCode" and "returnHttpHeaders" methods cause the client API to c
 ```java
 client.get("http://host/path", params -> {
 			
-    // Do not parse the response
+    // Instructs the client to copy the values
+    // into the "meta" block
     params.returnStatusCode();
     params.returnHttpHeaders();
 			

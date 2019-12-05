@@ -120,7 +120,7 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * Shut down ScheduledExecutorService on stop().
 	 */
 	protected boolean shutDownThreadPools;
-
+	
 	// --- INIT HTTP CLIENT ---
 
 	public void start() {
@@ -221,21 +221,7 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise connect(String url) {
-		return connect(url, null, null);
-	}
-
-	/**
-	 * Executes an HTTP CONNECT request.
-	 *
-	 * @param url
-	 *            A well formed URL.
-	 * @param request
-	 *            Request parameters in a Tree
-	 * 
-	 * @return {@link Promise}
-	 */
-	public Promise connect(String url, Tree request) {
-		return connect(url, request, null);
+		return connect(url, null);
 	}
 
 	/**
@@ -249,23 +235,7 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise connect(String url, Consumer<RequestParams> configurator) {
-		return connect(url, null, configurator);
-	}
-
-	/**
-	 * Executes an HTTP CONNECT request.
-	 *
-	 * @param url
-	 *            A well formed URL.
-	 * @param request
-	 *            Request parameters in a Tree
-	 * @param configurator
-	 *            Consumer for set the parameters of the request
-	 * 
-	 * @return {@link Promise}
-	 */
-	public Promise connect(String url, Tree request, Consumer<RequestParams> configurator) {
-		return execute(url, "CONNECT", new TreeConfigurator(configurator, request, false));
+		return execute(url, "CONNECT", configurator);
 	}
 
 	/**
@@ -321,7 +291,7 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise options(String url, Tree request, Consumer<RequestParams> configurator) {
-		return execute(url, "OPTIONS", new TreeConfigurator(configurator, request, true));
+		return execute(url, "OPTIONS", new TreeConfigurator(configurator, request, false));
 	}
 
 	/**
@@ -333,21 +303,7 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise head(String url) {
-		return head(url, null, null);
-	}
-
-	/**
-	 * Executes an HTTP HEAD request.
-	 *
-	 * @param url
-	 *            A well formed URL.
-	 * @param request
-	 *            Request parameters in a Tree
-	 * 
-	 * @return {@link Promise}
-	 */
-	public Promise head(String url, Tree request) {
-		return head(url, request, null);
+		return head(url, null);
 	}
 
 	/**
@@ -361,23 +317,7 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise head(String url, Consumer<RequestParams> configurator) {
-		return head(url, null, configurator);
-	}
-
-	/**
-	 * Executes an HTTP HEAD request.
-	 *
-	 * @param url
-	 *            A well formed URL.
-	 * @param request
-	 *            Request parameters in a Tree
-	 * @param configurator
-	 *            Consumer for set the parameters of the request
-	 * 
-	 * @return {@link Promise}
-	 */
-	public Promise head(String url, Tree request, Consumer<RequestParams> configurator) {
-		return execute(url, "HEAD", new TreeConfigurator(configurator, request, false));
+		return execute(url, "HEAD", configurator);
 	}
 
 	/**
@@ -717,7 +657,7 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 	 * @return {@link Promise}
 	 */
 	public Promise trace(String url, Tree request, Consumer<RequestParams> configurator) {
-		return execute(url, "TRACE", new TreeConfigurator(configurator, request, true));
+		return execute(url, "TRACE", new TreeConfigurator(configurator, request, false));
 	}
 
 	// --- WEBSOCKET LISTENER / RECEIVER ---
@@ -753,7 +693,7 @@ public class HttpClient extends DefaultAsyncHttpClientConfig.Builder {
 		}
 		if (params.handler == null) {
 			params.handler = new ResponseToJson(params);
-		}
+		}		
 		return new Promise(res -> {
 			client.executeRequest(params.build(), new AsyncHandler<Void>() {
 

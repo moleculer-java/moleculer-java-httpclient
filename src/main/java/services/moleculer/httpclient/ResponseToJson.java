@@ -45,7 +45,7 @@ public class ResponseToJson extends ResponseToBytes {
 		if (bytes.length == 0) {
 			rsp = new Tree();
 		} else {
-			rsp = new Tree(bytes);
+			rsp = new Tree(bytes);	
 		}
 		addStatusAndHeaders(rsp);
 		return rsp;

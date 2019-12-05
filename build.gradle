@@ -61,12 +61,12 @@ dependencies {
     // =============== HTTP CLIENT =================
         
 	// https://mvnrepository.com/artifact/org.asynchttpclient/async-http-client
-	compile group: 'org.asynchttpclient', name: 'async-http-client', version: '2.10.3'
+	compile group: 'org.asynchttpclient', name: 'async-http-client', version: '2.10.4'
     
     // ================= MOLECULER =================
 	
 	// Moleculer web (required)
-	compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.2.4'
+	compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.2.5'
 	
     // ================== LOGGING ==================
 	
@@ -123,7 +123,7 @@ modifyPom {
             dependency {
                 groupId 'org.asynchttpclient'
                 artifactId 'async-http-client'
-                version '2.10.3'
+                version '2.10.4'
                 scope 'runtime'
             }
         }

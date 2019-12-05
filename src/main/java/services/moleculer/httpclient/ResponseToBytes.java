@@ -57,8 +57,9 @@ public class ResponseToBytes extends ResponseHandler {
 			buffer.get(bytes, 0, len);
 		} else {
 			byte[] expanded = new byte[bytes.length + len];
-			System.arraycopy(bytes, 0, expanded, 0, bytes.length);
 			buffer.get(expanded, bytes.length, len);
+			System.arraycopy(bytes, 0, expanded, 0, bytes.length);
+			bytes = expanded;
 		}
 		return State.CONTINUE;
 	}

@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import org.asynchttpclient.ws.WebSocket;
 import org.junit.Test;
@@ -78,6 +79,10 @@ public class HttpClientTest extends TestCase {
 			}
 			Tree meta = data.getMeta();
 			meta.put("method", req.getMethod());
+			meta.put("path", req.getPath());
+			meta.put("query", req.getQuery());
+			meta.put("multipart", req.isMultipart());
+			meta.put("address", req.getAddress());
 			Iterator<String> headers = req.getHeaders();
 			while (headers.hasNext()) {
 				String header = headers.next();
@@ -90,7 +95,6 @@ public class HttpClientTest extends TestCase {
 			Action action = ctx -> {
 				lastCtx.set(ctx);
 				return ctx.params;
-
 			};
 
 		});
@@ -194,7 +198,7 @@ public class HttpClientTest extends TestCase {
 
 		// Connect via WebSocket
 		WebSocketConnection ws = cl.ws("http://127.0.0.1:8080/ws/test", new WebSocketHandler() {
-			
+
 			@Override
 			public void onMessage(Tree message) {
 				System.out.println("WebSocket message received: " + message);
@@ -217,16 +221,16 @@ public class HttpClientTest extends TestCase {
 				con[0] = false;
 				System.out.println("Disconnected");
 			}
-			
+
 		}, params -> {
-			
+
 			params.setHeartbeatInterval(30);
 			params.setHeartbeatTimeout(10);
 			params.setReconnectDelay(5);
-			
+
 			params.setHeader("CustomHeader", "CustomValue");
-			
-		});	
+
+		});
 		ws.waitForConnection(20, TimeUnit.SECONDS);
 		assertTrue(con[0]);
 
@@ -249,7 +253,7 @@ public class HttpClientTest extends TestCase {
 		StreamReceiver receiver = (StreamReceiver) br.getLocalService("streamReceiver");
 		PacketStream sender = br.createStream();
 
-		Promise p = cl.post(RECEIVER_URL, sender);
+		cl.post(RECEIVER_URL, sender);
 
 		sender.sendData("123".getBytes());
 		Thread.sleep(1000);
@@ -278,8 +282,106 @@ public class HttpClientTest extends TestCase {
 		receiver.buffer.reset();
 		receiver.closed.set(false);
 
-		rsp = p.waitFor(2000);
-		System.out.println(rsp);
+		Consumer<RequestParams> returnAll = new Consumer<RequestParams>() {
+
+			@Override
+			public void accept(RequestParams params) {
+				params.returnStatusCode().returnHttpHeaders();
+			}
+
+		};
+
+		// GET
+		check("GET", null, false, cl.get(TEST_URL));
+		check("GET", req, false, cl.get(TEST_URL, req));
+		check("GET", null, true, cl.get(TEST_URL, returnAll));
+		check("GET", req, true, cl.get(TEST_URL, req, returnAll));
+
+		// CONNECT
+		check("CONNECT", null, false, cl.connect(TEST_URL));
+		check("CONNECT", null, true, cl.connect(TEST_URL, returnAll));
+
+		// OPTIONS
+		check("OPTIONS", null, false, cl.options(TEST_URL));
+		check("OPTIONS", req, false, cl.options(TEST_URL, req));
+		check("OPTIONS", null, true, cl.options(TEST_URL, returnAll));
+		check("OPTIONS", req, true, cl.options(TEST_URL, req, returnAll));
+
+		// HEAD
+		check("HEAD", null, false, cl.head(TEST_URL));
+		check("HEAD", null, true, cl.head(TEST_URL, returnAll));
+
+		// POST
+		check("POST", null, false, cl.post(TEST_URL));
+		check("POST", req, false, cl.post(TEST_URL, req));
+		check("POST", null, true, cl.post(TEST_URL, returnAll));
+		check("POST", req, true, cl.post(TEST_URL, req, returnAll));
+
+		// PUT
+		check("PUT", null, false, cl.put(TEST_URL));
+		check("PUT", req, false, cl.put(TEST_URL, req));
+		check("PUT", null, true, cl.put(TEST_URL, returnAll));
+		check("PUT", req, true, cl.put(TEST_URL, req, returnAll));
+
+		// DELETE
+		check("DELETE", null, false, cl.delete(TEST_URL));
+		check("DELETE", req, false, cl.delete(TEST_URL, req));
+		check("DELETE", null, true, cl.delete(TEST_URL, returnAll));
+		check("DELETE", req, true, cl.delete(TEST_URL, req, returnAll));
+
+		// PATCH
+		check("PATCH", null, false, cl.patch(TEST_URL));
+		check("PATCH", req, false, cl.patch(TEST_URL, req));
+		check("PATCH", null, true, cl.patch(TEST_URL, returnAll));
+		check("PATCH", req, true, cl.patch(TEST_URL, req, returnAll));
+
+		// TRACE
+		check("TRACE", null, false, cl.trace(TEST_URL));
+		check("TRACE", req, false, cl.trace(TEST_URL, req));
+		check("TRACE", null, true, cl.trace(TEST_URL, returnAll));
+		check("TRACE", req, true, cl.trace(TEST_URL, req, returnAll));
+
+	}
+
+	private void check(String method, Tree request, boolean returnAll, Promise responsePromise) throws Exception {
+		long start = System.currentTimeMillis();
+		System.out.println("Testing " + method + " method...");
+		Tree rsp = responsePromise.waitFor(1000);
+		long duration = System.currentTimeMillis() - start;
+		assertTrue(duration < 100);
+		if ("CONNECT".equals(method)) {
+			assertEquals("SERVICE_NOT_FOUND_ERROR", rsp.get("type", ""));
+			return;
+		}
+		Context ctx = reset();
+		if (request != null) {
+			String s = request.toString(null, false, false).replace("\"", "");
+			assertEquals(s, rsp.toString(null, false, false).replace("\"", ""));
+			assertEquals(s, ctx.params.toString(null, false, false).replace("\"", ""));
+		}
+		if (returnAll) {
+			assertOk(rsp);
+			assertRestResponse(rsp);
+		} else {
+			assertNull(rsp.getMeta(false));
+		}
+		if (request == null) {
+			assertTrue(rsp.isEmpty());
+		} else {
+			assertFalse(rsp.isEmpty());
+		}
+		Tree meta = ctx.params.getMeta();
+		assertFalse(meta.isEmpty());
+		assertEquals(method, meta.get("method", ""));
+		assertTrue(meta.get("path", "").startsWith("/test.action"));
+		if (request != null && ("GET".equals(method) || "CONNECT".equals(method) || "HEAD".equals(method)
+				|| "OPTIONS".equals(method) || "TRACE".equals(method))) {
+			assertFalse(meta.get("query", "").isEmpty());
+		} else {
+			assertNull(meta.get("query", (String) null));
+		}
+		assertFalse(meta.get("multipart", true));
+		assertFalse(meta.get("address", "").isEmpty());
 	}
 
 }

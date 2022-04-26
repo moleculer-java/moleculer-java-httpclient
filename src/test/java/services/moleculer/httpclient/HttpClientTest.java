@@ -199,7 +199,7 @@ public class HttpClientTest extends TestCase {
 		assertEquals(1, ctx.params.get("a", 0));
 		assertEquals(true, ctx.params.get("b", false));
 		assertEquals("d", ctx.params.get("c", ""));
-		assertTrue(rsp.get("_meta.$headers.Content-Length", 0) > 2);
+		assertTrue(rsp.get("_meta.$headers.content-length", 0) > 2);
 
 		Tree[] arr = new Tree[1];
 		boolean[] con = new boolean[1];
@@ -496,7 +496,8 @@ public class HttpClientTest extends TestCase {
 		long duration = System.currentTimeMillis() - start;
 		assertTrue(duration < 100);
 		if ("CONNECT".equals(method)) {
-			assertEquals("SERVICE_NOT_FOUND_ERROR", rsp.get("type", ""));
+			String type = rsp.get("type", "");
+			assertTrue(type.contains("SERVICE_NOT_FOUND"));
 			return;
 		}
 		Context ctx = reset();

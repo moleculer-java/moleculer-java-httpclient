@@ -125,7 +125,12 @@ public class WebSocketConnection {
 	}
 
 	protected void openConnection() {
-		logger.info("Connecting to " + url + "...");
+		String u = url;
+		int i = u.indexOf('?');
+		if (i > 1) {
+			u = u.substring(0, i);
+		}
+		logger.info("Connecting to " + u + "...");
 
 		// Create "params" and invoke Configurator
 		AsyncHttpClient client = httpClient.getAsyncHttpClient();
@@ -143,6 +148,7 @@ public class WebSocketConnection {
 		upgradeHandlerBuilder.addWebSocketListener(new WebSocketListener() {
 
 			StringBuilder buffer = new StringBuilder();
+			boolean showError = true;
 
 			@Override
 			public final void onOpen(WebSocket websocket) {
@@ -183,6 +189,7 @@ public class WebSocketConnection {
 				if (previousPromise != null) {
 					previousPromise.complete();
 				}
+				showError = true;
 				logger.info("WebSocket channel opened.");
 			}
 
@@ -203,7 +210,12 @@ public class WebSocketConnection {
 				if (msg == null || msg.isEmpty()) {
 					msg = "Unexpected error occured!";
 				}
-				logger.error(msg, cause);
+				if (showError) {
+					showError = false;
+					logger.error(msg, cause);
+				} else {
+					logger.error(msg);
+				}
 				try {
 					handler.onError(cause);
 				} catch (Throwable userError) {

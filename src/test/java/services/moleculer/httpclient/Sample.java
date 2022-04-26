@@ -38,13 +38,7 @@ public class Sample {
 						
 			// Create JSON request (=POST body)
 			Tree req = new Tree().put("key", "value");
-
-			client.post("", params -> {
-				params.addCookie(null);
-			}).then(rsp -> {
-				
-			});
-			
+		
 			// Invoke REST service
 			client.post("http://localhost:4151/", req).then(rsp -> {
 				

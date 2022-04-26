@@ -66,21 +66,21 @@ dependencies {
     // ================= MOLECULER =================
 	
 	// Moleculer web (required)
-	compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.2.5'
+	compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.3.6'
 	
     // ================== LOGGING ==================
 	
 	// http://mvnrepository.com/artifact/org.slf4j/slf4j-api
-	compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.28'
+	compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.30'
        
 	// http://mvnrepository.com/artifact/org.slf4j/slf4j-jdk14
-	compile group: 'org.slf4j', name: 'slf4j-jdk14', version: '1.7.28'
+	compile group: 'org.slf4j', name: 'slf4j-jdk14', version: '1.7.30'
 
 	// https://mvnrepository.com/artifact/org.slf4j/log4j-over-slf4j
-	compile group: 'org.slf4j', name: 'log4j-over-slf4j', version: '1.7.28'
+	compile group: 'org.slf4j', name: 'log4j-over-slf4j', version: '1.7.30'
 
 	// https://mvnrepository.com/artifact/org.slf4j/jcl-over-slf4j
-	compile group: 'org.slf4j', name: 'jcl-over-slf4j', version: '1.7.28'
+	compile group: 'org.slf4j', name: 'jcl-over-slf4j', version: '1.7.30'
 }
 
 sourceCompatibility = 1.8
@@ -88,8 +88,9 @@ targetCompatibility = 1.8
 
 group = 'com.github.berkesa'
 
-// version = '1.0.0-SNAPSHOT'
-version = '1.0.0'
+// + JAR version
+// version = '1.0.2-SNAPSHOT'
+version = '1.0.2'
 
 modifyPom {
     project {
@@ -117,7 +118,7 @@ modifyPom {
             dependency {
                 groupId 'com.github.berkesa'
                 artifactId 'moleculer-java-web'
-                version '1.2.5'
+                version '1.3.6'
                 scope 'runtime'
             }
             dependency {
@@ -158,5 +159,5 @@ compileJava {
 
 jar {
     baseName = 'moleculer-httpclient'
-    version =  '1.0.0'
+    version =  '1.0.2'
 }

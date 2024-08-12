@@ -98,6 +98,8 @@ public class WebSocketConnection {
 	protected final AtomicLong submittedAt = new AtomicLong();
 	protected final AtomicLong receivedAt = new AtomicLong();
 
+	protected final AtomicBoolean showError = new AtomicBoolean(true);
+	
 	protected WebSocketParams params;
 
 	// --- CONSTRUCTOR ---
@@ -148,7 +150,6 @@ public class WebSocketConnection {
 		upgradeHandlerBuilder.addWebSocketListener(new WebSocketListener() {
 
 			StringBuilder buffer = new StringBuilder();
-			boolean showError = true;
 
 			@Override
 			public final void onOpen(WebSocket websocket) {
@@ -189,7 +190,7 @@ public class WebSocketConnection {
 				if (previousPromise != null) {
 					previousPromise.complete();
 				}
-				showError = true;
+				showError.set(true);
 				logger.info("WebSocket channel opened.");
 			}
 
@@ -210,8 +211,7 @@ public class WebSocketConnection {
 				if (msg == null || msg.isEmpty()) {
 					msg = "Unexpected error occured!";
 				}
-				if (showError) {
-					showError = false;
+				if (showError.compareAndSet(true, false)) {
 					logger.error(msg, cause);
 				} else {
 					logger.error(msg);

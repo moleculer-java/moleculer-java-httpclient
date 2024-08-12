@@ -89,8 +89,8 @@ targetCompatibility = 1.8
 group = 'com.github.berkesa'
 
 // + JAR version
-// version = '1.0.2-SNAPSHOT'
-version = '1.0.2'
+// version = '1.0.3-SNAPSHOT'
+version = '1.0.3'
 
 modifyPom {
     project {
@@ -159,5 +159,5 @@ compileJava {
 
 jar {
     baseName = 'moleculer-httpclient'
-    version =  '1.0.2'
+    version =  '1.0.3'
 }

@@ -42,10 +42,14 @@ public class ResponseToJson extends ResponseToBytes {
 	@Override
 	public Tree onCompleted() throws Exception {
 		Tree rsp;
-		if (bytes.length == 0) {
+		if (bytes == null || bytes.length == 0) {
+
+			// No response body (eg. empty 200/204 response). AsyncHttpClient 3.x
+			// does not invoke onBodyPartReceived when the body is empty, so
+			// "bytes" stays null - treat it as an empty JSON structure.
 			rsp = new Tree();
 		} else {
-			rsp = new Tree(bytes);	
+			rsp = new Tree(bytes);
 		}
 		addStatusAndHeaders(rsp);
 		return rsp;

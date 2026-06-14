@@ -66,7 +66,11 @@ public class ResponseToBytes extends ResponseHandler {
 
 	@Override
 	public Tree onCompleted() throws Exception {
-		Tree rsp = new CheckedTree(bytes);
+
+		// No response body (eg. empty 200/204 response). AsyncHttpClient 3.x
+		// does not invoke onBodyPartReceived when the body is empty, so "bytes"
+		// stays null - return an empty byte-array instead.
+		Tree rsp = new CheckedTree(bytes == null ? new byte[0] : bytes);
 		addStatusAndHeaders(rsp);
 		return rsp;
 	}

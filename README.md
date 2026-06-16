@@ -9,9 +9,11 @@ If a connection is lost, the client automatically rebuilds the connection.
 
 Requires **JDK 21**. Built on [AsyncHttpClient](https://github.com/AsyncHttpClient/async-http-client) 3.x.
 
-## Download
+## Documentation
 
-**Maven**
+[![Documentation](https://raw.githubusercontent.com/moleculer-java/site/master/docs/docs-button.png)](https://moleculer-java.github.io/site/http-client.html)
+
+## Download
 
 ```xml
 <dependency>
@@ -20,18 +22,6 @@ Requires **JDK 21**. Built on [AsyncHttpClient](https://github.com/AsyncHttpClie
     <version>2.0.0</version>
 </dependency>
 ```
-
-**Gradle**
-
-```gradle
-dependencies {
-    implementation 'com.github.berkesa:moleculer-java-httpclient:2.0.0'
-}
-```
-
-## Documentation
-
-[![Documentation](https://raw.githubusercontent.com/moleculer-java/site/master/docs/docs-button.png)](https://moleculer-java.github.io/site/http-client.html)
 
 ## License
 

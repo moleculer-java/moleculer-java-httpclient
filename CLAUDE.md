@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`moleculer-java-httpclient` is a small, asynchronous HTTP/WebSocket client **library** (not an application) for the Java Moleculer ecosystem. It wraps [AsyncHttpClient (AHC)](https://github.com/AsyncHttpClient/async-http-client) `3.0.7` and exposes a Promise-based API that speaks Moleculer's data types. Published to Maven Central as `com.github.berkesa:moleculer-java-httpclient`, version **`2.0.0`**. **JDK 21**, single package: `services.moleculer.httpclient`.
+`moleculer-java-httpclient` is a small, asynchronous HTTP/WebSocket client **library** (not an application) for the Java Moleculer ecosystem. It wraps [AsyncHttpClient (AHC)](https://github.com/AsyncHttpClient/async-http-client) `3.0.7` and exposes a Promise-based API that speaks Moleculer's data types. Published to Maven Central as `com.github.berkesa:moleculer-java-httpclient`, version **`2.0.0`**. Bytecode target **Java 17** (`<release>17</release>`); minimum consumer runtime: **JDK 17** (Spring 6 transitive). Build JDK 17+ (JDK 25 in use). Single package: `services.moleculer.httpclient`.
 
 ## Build & test commands
 
-The project builds with **Maven** (JDK 21). There is no wrapper — use a locally installed `mvn`.
+The project builds with **Maven** (Java 17). There is no wrapper — use a locally installed `mvn`.
 
 - Build + run tests + install to `~/.m2`: `mvn clean install`
 - Full check (compile + tests): `mvn clean verify`

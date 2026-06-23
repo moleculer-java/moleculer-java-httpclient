@@ -7,7 +7,7 @@ and it can receive WebSocket messages from a Netty/J2EE-based Moleculer applicat
 The built-in Heartbeat function automatically checks if a connection has been lost.
 If a connection is lost, the client automatically rebuilds the connection.
 
-Requires **JDK 21**. Built on [AsyncHttpClient](https://github.com/AsyncHttpClient/async-http-client) 3.x.
+Requires **JDK 17**. Built on [AsyncHttpClient](https://github.com/AsyncHttpClient/async-http-client) 3.x.
 
 ## Documentation
 

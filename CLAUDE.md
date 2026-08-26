@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`moleculer-java-httpclient` is a small, asynchronous HTTP/WebSocket client **library** (not an application) for the Java Moleculer ecosystem. It wraps [AsyncHttpClient (AHC)](https://github.com/AsyncHttpClient/async-http-client) `3.0.7` and exposes a Promise-based API that speaks Moleculer's data types. Published to Maven Central as `com.github.berkesa:moleculer-java-httpclient`, version **`2.0.0`**. Bytecode target **Java 17** (`<release>17</release>`); minimum consumer runtime: **JDK 17** (Spring 6 transitive). Build JDK 17+ (JDK 25 in use). Single package: `services.moleculer.httpclient`.
+`moleculer-java-httpclient` is a small, asynchronous HTTP/WebSocket client **library** (not an application) for the Java Moleculer ecosystem. It wraps [AsyncHttpClient (AHC)](https://github.com/AsyncHttpClient/async-http-client) `3.0.13` and exposes a Promise-based API that speaks Moleculer's data types. Published to Maven Central as `com.github.berkesa:moleculer-java-httpclient`, version **`2.1.0`**. Bytecode target **Java 17** (`<release>17</release>`); minimum consumer runtime: **JDK 17** (Spring 6 transitive). Build JDK 17+ (JDK 25 in use). Single package: `services.moleculer.httpclient`.
 
 ## Build & test commands
 
@@ -19,7 +19,7 @@ The project builds with **Maven** (Java 17). There is no wrapper — use a local
 
 ### Build gotchas
 
-1. **Netty version is pinned to `4.2.15.Final`.** `moleculer-java-web` brings a standalone Netty server at `4.2.15.Final`, while AHC `3.0.7` bundles Netty `4.2.9.Final`. The `pom.xml` imports `io.netty:netty-bom:4.2.15.Final` in `<dependencyManagement>` so every `io.netty:*` artifact resolves to one version — the embedded `ApiGateway`/`NettyServer` and the HTTP client share a single Netty on the port-8080 integration test. Verify with `mvn dependency:tree`.
+1. **Netty version is pinned to `4.2.17.Final`.** `moleculer-java-web` brings a standalone Netty server at `4.2.17.Final`, while AHC `3.0.13` bundles Netty `4.2.17.Final` too. The `pom.xml` imports `io.netty:netty-bom:4.2.17.Final` in `<dependencyManagement>` so every `io.netty:*` artifact resolves to one version — the embedded `ApiGateway`/`NettyServer` and the HTTP client share a single Netty on the port-8080 integration test. Verify with `mvn dependency:tree`.
 2. **`HttpClientTest` is an end-to-end integration test, not a unit test.** Its `@BeforeEach setUp()` boots a real embedded Moleculer app — a `ServiceBroker` with a Netty `ApiGateway` listening on **port 8080** — then exercises the client against it over real HTTP and WebSocket; `@AfterEach tearDown()` stops both. Port 8080 must be free: `setUp()` probes it and `assumeTrue(...)`-skips the whole test (keeping `mvn verify` green) when it cannot bind. One large method covers all HTTP verbs, streaming, the `transferTo(...)` targets, and WebSockets. The `nio-multipart-parser` dependency is declared at **test scope** because the embedded `ApiGateway` needs it at runtime (web ships it as `optional`).
 
 ## Architecture

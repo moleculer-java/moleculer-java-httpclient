@@ -19,7 +19,7 @@ Requires **JDK 17**. Built on [AsyncHttpClient](https://github.com/AsyncHttpClie
 <dependency>
     <groupId>com.github.berkesa</groupId>
     <artifactId>moleculer-java-httpclient</artifactId>
-    <version>2.1.0</version>
+    <version>2.1.1</version>
 </dependency>
 ```
 

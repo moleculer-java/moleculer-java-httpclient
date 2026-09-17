@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`moleculer-java-httpclient` is a small, asynchronous HTTP/WebSocket client **library** (not an application) for the Java Moleculer ecosystem. It wraps [AsyncHttpClient (AHC)](https://github.com/AsyncHttpClient/async-http-client) `3.0.13` and exposes a Promise-based API that speaks Moleculer's data types. Published to Maven Central as `com.github.berkesa:moleculer-java-httpclient`, version **`2.1.0`**. Bytecode target **Java 17** (`<release>17</release>`); minimum consumer runtime: **JDK 17** (Spring 6 transitive). Build JDK 17+ (JDK 25 in use). Single package: `services.moleculer.httpclient`.
+`moleculer-java-httpclient` is a small, asynchronous HTTP/WebSocket client **library** (not an application) for the Java Moleculer ecosystem. It wraps [AsyncHttpClient (AHC)](https://github.com/AsyncHttpClient/async-http-client) `3.0.13` and exposes a Promise-based API that speaks Moleculer's data types. Published to Maven Central as `com.github.berkesa:moleculer-java-httpclient`, version **`2.1.1`**. Bytecode target **Java 17** (`<release>17</release>`); minimum consumer runtime: **JDK 17** (Spring 6 transitive). Build JDK 17+ (JDK 25 in use). Single package: `services.moleculer.httpclient`.
 
 ## Build & test commands
 
